@@ -1,0 +1,41 @@
+/recipes
+
+# VS Code: ignore personal settings, keep shareable ones
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.code-workspace
+.history/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# SeaDrive / sync conflict copies
+*(SFConflict*)*
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Node (if tooling is added later)
+node_modules/
+npm-debug.log*

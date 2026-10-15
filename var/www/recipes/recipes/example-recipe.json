@@ -1,0 +1,50 @@
+{
+  "title": "Garlic Tomato Spaghetti",
+  "description": "A quick weeknight pasta with a garlicky tomato sauce.",
+  "servings": 4,
+  "time": "30 min",
+  "tags": ["pasta", "vegetarian", "quick"],
+  "source": "Adapted from a favourite cookbook (or paste a web address here)",
+  "ingredients": [
+    { "amount": 3, "unit": "tbsp", "name": "olive oil" },
+    "water for boiling the pasta",
+    {
+      "group": "Sauce",
+      "items": [
+        { "amount": 4, "name": "garlic cloves", "note": "thinly sliced" },
+        { "amount": 800, "unit": "g", "name": "canned chopped tomatoes" },
+        { "amount": "1/2", "unit": "tsp", "name": "dried oregano" },
+        { "amount": null, "unit": "to taste", "name": "salt and black pepper" }
+      ]
+    },
+    {
+      "group": "To serve",
+      "items": [
+        { "amount": 400, "unit": "g", "name": "spaghetti" },
+        { "amount": 1, "unit": "cup", "name": "grated Parmesan", "note": "optional" },
+        { "amount": 1, "unit": "handful", "name": "fresh basil leaves" }
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "title": "Start the sauce",
+      "text": "Warm the olive oil in a large pan over medium heat. Add the garlic and cook gently until fragrant, taking care not to brown it."
+    },
+    {
+      "title": "Simmer",
+      "text": "Add the tomatoes and oregano, season, and simmer until slightly thickened.",
+      "timer": 900
+    },
+    {
+      "title": "Cook the pasta",
+      "text": "Boil the spaghetti in well-salted water according to the package instructions, then drain, keeping a cup of the cooking water.",
+      "timer": 600
+    },
+    "Toss the pasta through the sauce, loosening it with a splash of cooking water if needed. Top with Parmesan and basil, and serve."
+  ],
+  "notes": [
+    "The sauce keeps in the fridge for up to 3 days.",
+    "Add a pinch of chilli flakes with the garlic for some heat."
+  ]
+}
