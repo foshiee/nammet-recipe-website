@@ -31,6 +31,7 @@ Not supported: HEIC photos (export as JPEG or take a screenshot), Word and other
 
 - Node.js 20 or newer on the VM, with npm (`node --version`). On RHEL-family systems: `sudo dnf module install nodejs:22`, or the NodeSource packages.
 - The `acl` package, for `setfacl` (usually installed already: `rpm -q acl`).
+- Git, to fetch the code from the private GitHub repo (`sudo dnf install git`), and outbound SSH (port 22) to `github.com`.
 - Outbound internet access from the VM on ports 443 and 80: to `api.anthropic.com` for Claude imports, to any recipe site you import from, and to `registry.npmjs.org` while installing. The service connects directly; it doesn't support an outbound HTTP proxy. To check, run this on the VM. Each line should print an HTTP status code; a timeout or `000` means outbound access is blocked:
 
   ```sh
@@ -44,30 +45,41 @@ Not supported: HEIC photos (export as JPEG or take a screenshot), Word and other
 
 ## First-time setup on the VM
 
-### 1. Package the files (on your PC)
+The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so that root needs no GitHub access and the clone stays yours; only the commands that install files use `sudo`.
 
-The repo mirrors the server's layout, so one archive carries everything. In PowerShell from the repo root (Windows 10 and 11 include `tar` and `scp`):
+### 1. Give the VM read access to the repo
 
-```powershell
-tar -czf nomnoms-deploy.tgz --exclude=node_modules --exclude=dev-users.json `
-  opt/nomnoms-api etc/nomnoms etc/systemd etc/nginx/nginx.conf etc/nginx/conf.d/nginx-nomnoms.conf `
-  var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css
-scp nomnoms-deploy.tgz you@your-vm:~/
-```
-
-### 2. Unpack and fix line endings (on the VM)
-
-Run everything from here on as a user with sudo.
+A deploy key is an SSH key that can read this one repo and nothing else on your GitHub account. Create it on the VM:
 
 ```sh
-rm -rf /tmp/nomnoms-deploy && mkdir /tmp/nomnoms-deploy
-tar -xzf ~/nomnoms-deploy.tgz -C /tmp/nomnoms-deploy
-cd /tmp/nomnoms-deploy
-# Git on Windows may have turned line endings into CRLF. A stray \r breaks the
-# systemd unit and gets glued onto the API key, so strip them from everything.
-find . -type f \( -name '*.js' -o -name '*.json' -o -name '*.html' -o -name '*.css' \
-  -o -name '*.conf' -o -name '*.service' -o -name '*.example' \) -exec sed -i 's/\r$//' {} +
+ssh-keygen -t ed25519 -f ~/.ssh/nomnoms_deploy -N "" -C "nomnoms-vm"
+cat ~/.ssh/nomnoms_deploy.pub
 ```
+
+On GitHub, open the repo and go to **Settings → Deploy keys → Add deploy key**. Paste the public key and leave **Allow write access** unticked. Then tell SSH to use the key for GitHub:
+
+```sh
+cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  IdentityFile ~/.ssh/nomnoms_deploy
+  IdentitiesOnly yes
+EOF
+chmod 600 ~/.ssh/config
+ssh -T git@github.com     # "Hi foshiee/nomnoms-recipe-website! You've successfully authenticated..."
+```
+
+The first connection asks you to confirm GitHub's host key. Compare the fingerprint with the ones listed on [GitHub's SSH key fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints) page before typing `yes`.
+
+### 2. Clone the repo
+
+Clone it into your home directory. Never clone it into `/var/www`, where nginx would serve `.git/` and everything else in the repo.
+
+```sh
+git clone git@github.com:foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
+cd ~/nomnoms-recipe-website
+```
+
+The steps below run from this folder. The repo's `.gitattributes` makes every checkout use LF line endings, which the systemd unit and `api.env` need.
 
 ### 3. Install the website
 
@@ -168,9 +180,6 @@ The address to use, and how to find it, is in the security checklist below.
 6. Watch it all in the log: `journalctl -u nomnoms-api -f`.
 
 If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux boolean from step 10, and `sudo tail /var/log/nginx/error.log`.
-
-When it all works, delete the staging files: `rm -rf /tmp/nomnoms-deploy ~/nomnoms-deploy.tgz`.
-
 ## Security checklist (Traefik in front)
 
 Traefik ends HTTPS, so passwords and session cookies are encrypted between the browser and your network. Check the following:
@@ -212,7 +221,7 @@ What the service does to protect itself:
 - **List users:** `--list` instead of a name.
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** package and unpack as in setup steps 1 and 2, then repeat step 3 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users file and `api.env` are never part of the package, so updates don't touch them.
+- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat setup step 3 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users file, `api.env` and the recipes all live outside the clone, so updates don't touch them.
 
 ## Cost of Claude imports
 
