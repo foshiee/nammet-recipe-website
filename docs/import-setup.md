@@ -1,4 +1,4 @@
-# Recipe import: setup and operation
+# Server setup and recipe import
 
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, an **Import recipe** button appears at the top right of the home page and stays for the session (7 days by default). From there you can import a recipe from a file, a web address or pasted text, check and edit it, and save it straight into the recipes folder. It appears on the site immediately.
 
@@ -29,25 +29,60 @@ Not supported: HEIC photos (export as JPEG or take a screenshot), Word and other
 
 ## Requirements
 
-- Node.js 20 or newer on the VM, with npm (`node --version`). On RHEL-family systems: `sudo dnf module install nodejs:22`, or the NodeSource packages.
-- The `acl` package, for `setfacl` (usually installed already: `rpm -q acl`).
-- Git, to fetch the code from the private GitHub repo (`sudo dnf install git`), and outbound SSH (port 22) to `github.com`.
-- Outbound internet access from the VM on ports 443 and 80: to `api.anthropic.com` for Claude imports, to any recipe site you import from, and to `registry.npmjs.org` while installing. The service connects directly; it doesn't support an outbound HTTP proxy. To check, run this on the VM. Each line should print an HTTP status code; a timeout or `000` means outbound access is blocked:
-
-  ```sh
-  curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://api.anthropic.com/
-  curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://www.bbcgoodfood.com/
-  curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://registry.npmjs.org/
-  ```
-
-  Any number counts as success, including `404`; it only proves the VM can reach the site.
+- A VM for Rocky Linux 10. 1 vCPU, 2 GB of RAM and a 20 GB disk are plenty.
+- A Traefik router that ends HTTPS for the site's host name and forwards to port 80 on the VM. Setting up Traefik isn't covered here; the [security checklist](#security-checklist-traefik-in-front) lists what nginx needs to know about it.
+- Outbound internet access from the VM: ports 80 and 443 for package installs, `api.anthropic.com`, `registry.npmjs.org` and any recipe site you import from, plus port 22 to `github.com` for fetching the code. The service connects directly; it doesn't support an outbound HTTP proxy.
 - An Anthropic API key for PDF, photo and text imports, from [console.anthropic.com](https://console.anthropic.com). Without one, `.json` files and most recipe websites still import.
 
-## First-time setup on the VM
+## Preparing the VM
+
+### 1. Install Rocky Linux 10
+
+Boot the VM from the Rocky Linux 10 minimal ISO. In the installer:
+
+- **Software Selection:** Minimal Install.
+- **Network & Host Name:** switch the network adapter on and set a host name. Give the VM a fixed address, either static or a DHCP reservation, so Traefik can always find it.
+- **Root Account:** leave it locked.
+- **User Creation:** create your own account and make it an administrator (wheel group), so it can use `sudo`.
+
+Leave SELinux enforcing, which is the default. The steps below set the labels and permissions it needs.
+
+When the install finishes, sign in over SSH as your user (`ssh you@your-vm`) and run everything from there.
+
+### 2. Update and install packages
+
+```sh
+sudo dnf -y update
+sudo dnf -y install nginx nodejs npm git acl nano firewalld policycoreutils
+sudo systemctl enable --now firewalld
+sudo reboot
+```
+
+The reboot picks up any new kernel. After signing back in, check Node.js:
+
+```sh
+node --version     # v20 or newer
+```
+
+Rocky Linux 10 ships Node.js 22 in its AppStream repository, so no extra repository is needed.
+
+### 3. Check outbound access
+
+Each line should print an HTTP status code. A timeout or `000` means outbound access is blocked:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://api.anthropic.com/
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://www.bbcgoodfood.com/
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://registry.npmjs.org/
+```
+
+Any number counts as success, including `404`; it only proves the VM can reach the site. GitHub access over SSH is checked in step 4.
+
+## Installing the site and import service
 
 The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so that root needs no GitHub access and the clone stays yours; only the commands that install files use `sudo`.
 
-### 1. Give the VM read access to the repo
+### 4. Give the VM read access to the repo
 
 A deploy key is an SSH key that can read this one repo and nothing else on your GitHub account. Create it on the VM:
 
@@ -70,7 +105,7 @@ ssh -T git@github.com     # "Hi foshiee/nomnoms-recipe-website! You've successfu
 
 The first connection asks you to confirm GitHub's host key. Compare the fingerprint with the ones listed on [GitHub's SSH key fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints) page before typing `yes`.
 
-### 2. Clone the repo
+### 5. Clone the repo
 
 Clone it into your home directory. Never clone it into `/var/www`, where nginx would serve `.git/` and everything else in the repo.
 
@@ -81,7 +116,7 @@ cd ~/nomnoms-recipe-website
 
 The steps below run from this folder. The repo's `.gitattributes` makes every checkout use LF line endings, which the systemd unit and `api.env` need.
 
-### 3. Install the website
+### 6. Install the website
 
 ```sh
 sudo install -d -m 0755 /var/www/nomnoms /var/www/nomnoms/recipes
@@ -91,14 +126,14 @@ sudo restorecon -Rv /var/www/nomnoms   # SELinux labels
 
 Recipe files go in `/var/www/nomnoms/recipes/`; see [recipe-format.md](recipe-format.md).
 
-### 4. Create the service account and its data folder
+### 7. Create the service account and its data folder
 
 ```sh
 sudo useradd --system --home-dir /var/lib/nomnoms --shell /sbin/nologin nomnoms
 sudo install -d -m 0700 -o nomnoms -g nomnoms /var/lib/nomnoms
 ```
 
-### 5. Install the service code
+### 8. Install the service code
 
 ```sh
 sudo mkdir -p /opt/nomnoms-api
@@ -108,7 +143,7 @@ cd /opt/nomnoms-api && sudo npm ci --omit=dev && cd -
 
 `npm ci` installs the two dependencies (`@anthropic-ai/sdk` and `busboy`) at the exact versions in `package-lock.json`.
 
-### 6. Let the service write recipes
+### 9. Let the service write recipes
 
 This adds write access for `nomnoms` without changing who owns the folder, so you can still copy files in by hand:
 
@@ -116,7 +151,7 @@ This adds write access for `nomnoms` without changing who owns the folder, so yo
 sudo setfacl -m u:nomnoms:rwx /var/www/nomnoms/recipes
 ```
 
-### 7. Configuration
+### 10. Configuration
 
 ```sh
 sudo install -d -m 0750 -o root -g nomnoms /etc/nomnoms
@@ -126,7 +161,7 @@ sudo nano /etc/nomnoms/api.env     # paste your key after ANTHROPIC_API_KEY=
 
 No quotes or spaces around the key. If you leave it empty for now, everything except PDF, photo and text imports still works. Add it later and restart the service.
 
-### 8. Create your login
+### 11. Create your login
 
 Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory.
 
@@ -136,7 +171,7 @@ sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js yo
 cd -
 ```
 
-### 9. Start the service
+### 12. Start the service
 
 ```sh
 sudo install -m 0644 etc/systemd/system/nomnoms-api.service /etc/systemd/system/
@@ -148,7 +183,7 @@ curl -s http://127.0.0.1:3000/api/me         # {"user":null}
 
 The service listens only on `127.0.0.1`, so no firewall port needs opening for it.
 
-### 10. SELinux
+### 13. SELinux
 
 nginx needs permission to connect to the service:
 
@@ -156,7 +191,7 @@ nginx needs permission to connect to the service:
 sudo setsebool -P httpd_can_network_connect 1
 ```
 
-### 11. nginx
+### 14. nginx
 
 ```sh
 sudo install -m 0644 etc/nginx/nginx.conf /etc/nginx/nginx.conf
@@ -170,7 +205,7 @@ The main `nginx.conf` is the stock one with its sample server blocks commented o
 
 The address to use, and how to find it, is in the security checklist below.
 
-### 12. Check it end to end
+### 15. Check it end to end
 
 1. Open the site in a browser over HTTPS. There should be a small **Sign in** link at the bottom of the home page. If it isn't there, force-refresh the page (Ctrl+F5) to drop the cached `app.js`.
 2. Click it and sign in. You should land on the import screen, and the home page should now show **Import recipe** at the top right.
@@ -179,7 +214,8 @@ The address to use, and how to find it, is in the security checklist below.
 5. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
 6. Watch it all in the log: `journalctl -u nomnoms-api -f`.
 
-If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux boolean from step 10, and `sudo tail /var/log/nginx/error.log`.
+If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux boolean from step 13, and `sudo tail /var/log/nginx/error.log`.
+
 ## Security checklist (Traefik in front)
 
 Traefik ends HTTPS, so passwords and session cookies are encrypted between the browser and your network. Check the following:
@@ -221,7 +257,7 @@ What the service does to protect itself:
 - **List users:** `--list` instead of a name.
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat setup step 3 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users file, `api.env` and the recipes all live outside the clone, so updates don't touch them.
+- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users file, `api.env` and the recipes all live outside the clone, so updates don't touch them.
 
 ## Cost of Claude imports
 

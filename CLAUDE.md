@@ -18,7 +18,7 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `etc/systemd/system/nomnoms-api.service` | same | systemd unit for the service, which can write only to the recipes folder. |
 | `etc/nomnoms/api.env.example` | `/etc/nomnoms/api.env` | Service settings, including `ANTHROPIC_API_KEY`. The real file is never committed. |
 | `docs/recipe-format.md` | n/a | Authoritative recipe JSON spec. |
-| `docs/import-setup.md` | n/a | Deploying and running the import service, plus the security checklist. |
+| `docs/import-setup.md` | n/a | Server setup from a fresh Rocky Linux 10 VM, running the import service, and the security checklist. |
 | `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
 
