@@ -7,7 +7,7 @@ The static site still works without any of this. If the import service is down, 
 ## How it works
 
 ```
-browser ──HTTPS──> Traefik ──HTTP──> nginx :80 ──> /var/www/nomnoms        (static site, as before)
+browser ──HTTPS──> Traefik ──HTTP──> nginx :80 ──> /var/www/nomnoms        (static site)
                                           └─ /api/ ──> nomnoms-api :3000   (Node, 127.0.0.1 only)
                                                           ├─ reads  /var/lib/nomnoms/users.json
                                                           ├─ writes /var/www/nomnoms/recipes/<name>.json
@@ -50,7 +50,7 @@ The repo mirrors the server's layout, so one archive carries everything. In Powe
 
 ```powershell
 tar -czf nomnoms-deploy.tgz --exclude=node_modules --exclude=dev-users.json `
-  opt/nomnoms-api etc/nomnoms etc/systemd etc/nginx/conf.d/nginx-nomnoms.conf `
+  opt/nomnoms-api etc/nomnoms etc/systemd etc/nginx/nginx.conf etc/nginx/conf.d/nginx-nomnoms.conf `
   var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css
 scp nomnoms-deploy.tgz you@your-vm:~/
 ```
@@ -69,14 +69,15 @@ find . -type f \( -name '*.js' -o -name '*.json' -o -name '*.html' -o -name '*.c
   -o -name '*.conf' -o -name '*.service' -o -name '*.example' \) -exec sed -i 's/\r$//' {} +
 ```
 
-### 3. Update the website
-
-This adds the Import recipe button and the sign-in and import screens. Your recipes folder is untouched.
+### 3. Install the website
 
 ```sh
+sudo install -d -m 0755 /var/www/nomnoms /var/www/nomnoms/recipes
 sudo install -m 0644 var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css /var/www/nomnoms/
-sudo restorecon -v /var/www/nomnoms/*.html /var/www/nomnoms/*.js /var/www/nomnoms/*.css   # SELinux labels
+sudo restorecon -Rv /var/www/nomnoms   # SELinux labels
 ```
+
+Recipe files go in `/var/www/nomnoms/recipes/`; see [recipe-format.md](recipe-format.md).
 
 ### 4. Create the service account and its data folder
 
@@ -146,13 +147,14 @@ sudo setsebool -P httpd_can_network_connect 1
 ### 11. nginx
 
 ```sh
-# Older installs used recipes.conf. Move it out of conf.d, or nginx sees two default servers.
-[ -f /etc/nginx/conf.d/recipes.conf ] && sudo mv /etc/nginx/conf.d/recipes.conf /root/recipes.conf.bak
-[ -f /etc/nginx/conf.d/nomnoms.conf ] && sudo cp /etc/nginx/conf.d/nomnoms.conf /root/nomnoms.conf.bak
+sudo install -m 0644 etc/nginx/nginx.conf /etc/nginx/nginx.conf
 sudo install -m 0644 etc/nginx/conf.d/nginx-nomnoms.conf /etc/nginx/conf.d/nomnoms.conf
 sudo nano /etc/nginx/conf.d/nomnoms.conf     # set Traefik's address, uncomment the three real-IP lines
-sudo nginx -t && sudo systemctl reload nginx
+sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
+sudo firewall-cmd --permanent --add-service=http && sudo firewall-cmd --reload   # so Traefik can reach port 80
 ```
+
+The main `nginx.conf` is the stock one with its sample server blocks commented out, so `nomnoms.conf` is the only site.
 
 The address to use, and how to find it, is in the security checklist below.
 

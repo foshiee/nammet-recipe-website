@@ -64,3 +64,4 @@ Node 20+, ES modules, two dependencies (`@anthropic-ai/sdk`, `busboy`). Settings
 - Keep quantities out of step and note text; those strings are never scaled.
 - Colours live in CSS variables at the top of `style.css`, with a dark-mode override block.
 - Unit aliases exist in both `app.js` (`ALIASES`) and `opt/nomnoms-api/import/ingredient.js` (`UNITS`). Keep them in sync.
+- Docs describe a fresh, valid install of the current layout. Don't add upgrade or migration steps (old paths, renamed files, backing up previous configs); if a change affects an existing server, say so in the commit message or to the user instead.
