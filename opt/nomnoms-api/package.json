@@ -1,0 +1,20 @@
+{
+  "name": "nomnoms-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Login and recipe import service for the nomnoms recipe site",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "add-user": "node tools/add-user.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "busboy": "^1.6.0"
+  }
+}

@@ -1,0 +1,33 @@
+# Save as /etc/systemd/system/nomnoms-api.service on the recipe VM
+[Unit]
+Description=nomnoms recipe import API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nomnoms
+Group=nomnoms
+WorkingDirectory=/opt/nomnoms-api
+EnvironmentFile=/etc/nomnoms/api.env
+ExecStart=/usr/bin/node /opt/nomnoms-api/server.js
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the service can only write to the recipes folder
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/recipes/recipes
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

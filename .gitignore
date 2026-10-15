@@ -36,6 +36,7 @@ logs/
 *.pem
 *.key
 
-# Node (if tooling is added later)
+# Node (import service in opt/nomnoms-api)
 node_modules/
 npm-debug.log*
+dev-users.json

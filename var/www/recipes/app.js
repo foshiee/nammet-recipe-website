@@ -174,7 +174,10 @@
     checked: new Set(),
     timers: {},
     wakeLock: null,
-    wakeWanted: false
+    wakeWanted: false,
+    user: null,
+    userKnown: false,
+    imp: { busy: false, error: '', draft: null }
   };
 
   function normalizeGroups(raw) {
@@ -229,6 +232,7 @@
 
   async function loadRecipes() {
     state.problems = [];
+    state.loadFailed = false;
     let files = null;
 
     // Preferred: nginx lists the folder as JSON, so new files appear automatically.
@@ -294,17 +298,34 @@
 
     app.innerHTML = `
       <section class="home">
-        <h1>Recipes</h1>
-        ${n ? `<p class="count">${n} ${n === 1 ? 'recipe' : 'recipes'}</p>
+        <div class="home-head">
+          <h1>Recipes</h1>
+          <div id="account-head"></div>
+        </div>
+        ${n ?`<p class="count">${n} ${n === 1 ? 'recipe' : 'recipes'}</p>
         <input id="search" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes" autocomplete="off" value="${esc(state.query)}">` : ''}
         <div id="tags" class="tags"></div>
         <ul id="list" class="list"></ul>
         <p id="empty" class="empty" hidden></p>
         ${problems}
+        <footer id="account-foot" class="site-foot"></footer>
       </section>`;
 
     drawTags();
     drawList();
+    drawAccount();
+  }
+
+  // Import is offered only to signed-in users. Visitors just see a small sign-in link in the footer.
+  function drawAccount() {
+    const head = document.getElementById('account-head');
+    const foot = document.getElementById('account-foot');
+    if (head) head.innerHTML = state.user ? '<a class="button" href="#/import">Import recipe</a>' : '';
+    if (foot) {
+      foot.innerHTML = !state.userKnown ? ''
+        : state.user ? `Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button>`
+        : '<a href="#/import">Sign in</a>';
+    }
   }
 
   function drawTags() {
@@ -338,7 +359,7 @@
 
     if (!state.recipes.length) {
       empty.hidden = false;
-      empty.textContent = 'No recipes yet. Add a .json file to the recipes folder on the server, then reload this page.';
+      empty.textContent = 'No recipes yet. Sign in and use Import recipe, or add a .json file to the recipes folder on the server and reload this page.';
     } else if (!shown.length) {
       empty.hidden = false;
       empty.innerHTML = 'Nothing matches your search. <button class="link-button" data-action="clear">Clear search</button>';
@@ -605,6 +626,331 @@
     if (document.visibilityState === 'visible' && state.wakeWanted && state.current) setWake(true);
   });
 
+  /* ---------- sign-in & import ---------- */
+
+  // The import service lives at /api/ (opt/nomnoms-api). Browsing never depends on it.
+  async function api(path, { method = 'GET', json, form } = {}) {
+    const opts = { method, headers: { 'X-Requested-With': 'nomnoms' }, credentials: 'same-origin', cache: 'no-store' };
+    if (json !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(json);
+    }
+    if (form) opts.body = form;
+    let res;
+    try {
+      res = await fetch('api/' + path, opts);
+    } catch (e) {
+      throw Object.assign(new Error("Couldn't reach the server. Check your connection."), { status: 0 });
+    }
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* not JSON */ }
+    if (!res.ok) {
+      const msg = (data && data.error) ||
+        (res.status === 404 || res.status >= 502 ? "The import service isn't available on this server." : `Request failed (HTTP ${res.status}).`);
+      throw Object.assign(new Error(msg), { status: res.status, data });
+    }
+    return data;
+  }
+
+  async function loadUser() {
+    try {
+      state.user = (await api('me')).user;
+    } catch (e) {
+      state.user = null;
+    }
+    state.userKnown = true;
+  }
+
+  const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const MAX_UPLOAD = 20 * 1024 * 1024;
+
+  const METHOD_TEXT = {
+    json: 'Read directly from a recipe file.',
+    jsonld: 'Read from the recipe data the web page publishes. No AI was involved.',
+    claude: 'Extracted by Claude. Check the amounts, units and steps against the original before saving.'
+  };
+
+  function showImport() {
+    document.title = 'Import a recipe | Recipes';
+
+    if (!state.userKnown) {
+      app.innerHTML = '<p class="status">Checking sign-in…</p>';
+      return;
+    }
+
+    if (!state.user) {
+      app.innerHTML = `
+        <section class="import">
+          <a class="back" href="#/">All recipes</a>
+          <h1>Sign in</h1>
+          <p class="lede">Sign in to import recipes.</p>
+          <form class="login" data-action="login">
+            <label for="login-user">User name</label>
+            <input id="login-user" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            <label for="login-pass">Password</label>
+            <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+            <button class="button" type="submit">Sign in</button>
+            <p id="login-status" class="form-error" role="alert">${esc(state.imp.error)}</p>
+          </form>
+        </section>`;
+      document.getElementById('login-user').focus();
+      return;
+    }
+
+    app.innerHTML = `
+      <section class="import">
+        <div class="import-top">
+          <a class="back" href="#/">All recipes</a>
+          <p class="who">Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button></p>
+        </div>
+        <h1>Import a recipe</h1>
+        <div id="import-body"></div>
+      </section>`;
+    drawImport();
+  }
+
+  function drawImport() {
+    const box = document.getElementById('import-body');
+    if (!box) return;
+    box.innerHTML = state.imp.draft ? reviewHtml(state.imp.draft) : sourcesHtml();
+    if (state.imp.draft) drawPreview();
+    else setImportBusy(state.imp.busy);
+  }
+
+  function sourcesHtml() {
+    return `
+      <p class="lede">Bring in a recipe from a file, a web page or pasted text. You'll check it before anything is saved.</p>
+      <div id="imp-status" class="imp-status" aria-live="polite">${importStatusHtml()}</div>
+      <div class="sources">
+        <form class="source" data-action="import-file" data-drop>
+          <h2>From a file</h2>
+          <p class="hint">A recipe .json file, a PDF, a photo or screenshot, a saved web page, or a text file. You can also drop a file or a link here.</p>
+          <input type="file" name="file" aria-label="Recipe file"
+            accept=".json,.pdf,.html,.htm,.txt,.md,application/json,application/pdf,text/html,text/plain,image/jpeg,image/png,image/webp,image/gif">
+          <button class="button" type="submit">Import file</button>
+        </form>
+        <form class="source" data-action="import-url">
+          <h2>From a web page</h2>
+          <p class="hint">Most recipe sites publish their recipes in a standard format, which imports exactly.</p>
+          <input type="url" name="url" placeholder="https://" aria-label="Web page address" required>
+          <button class="button" type="submit">Import page</button>
+        </form>
+        <form class="source" data-action="import-text">
+          <h2>Paste text</h2>
+          <p class="hint">Copy a recipe from an email, a note or a message.</p>
+          <textarea name="text" rows="6" aria-label="Recipe text" required></textarea>
+          <button class="button" type="submit">Import text</button>
+        </form>
+      </div>`;
+  }
+
+  function importStatusHtml() {
+    if (state.imp.busy) return '<p class="working">Reading the recipe… PDFs and photos can take up to a minute.</p>';
+    if (state.imp.error) return `<p class="form-error">${esc(state.imp.error)}</p>`;
+    return '';
+  }
+
+  function setImportBusy(busy) {
+    state.imp.busy = busy;
+    const status = document.getElementById('imp-status');
+    if (status) status.innerHTML = importStatusHtml();
+    app.querySelectorAll('.sources button, .sources input, .sources textarea').forEach((el) => { el.disabled = busy; });
+  }
+
+  async function runImport(body) {
+    if (state.imp.busy) return;
+    state.imp.error = '';
+    setImportBusy(true);
+    try {
+      const data = await api('import', body instanceof FormData ? { method: 'POST', form: body } : { method: 'POST', json: body });
+      state.imp.draft = {
+        method: data.method,
+        errors: data.errors || [],
+        warnings: data.warnings || [],
+        slug: data.slug || '',
+        text: JSON.stringify(data.recipe, null, 2),
+        saveMsg: '',
+        conflict: false,
+        saving: false
+      };
+    } catch (e) {
+      if (e.status === 401) state.user = null;
+      state.imp.error = e.message;
+    }
+    state.imp.busy = false;
+    if (location.hash === '#/import') showImport();
+  }
+
+  function importFile(file) {
+    if (!file) {
+      state.imp.error = 'Choose a file first.';
+      setImportBusy(false);
+      return;
+    }
+    if (file.size > MAX_UPLOAD) {
+      state.imp.error = 'Files must be under 20 MB.';
+      setImportBusy(false);
+      return;
+    }
+    const form = new FormData();
+    form.append('file', file, file.name);
+    runImport(form);
+  }
+
+  function reviewHtml(d) {
+    return `
+      <p class="method method-${esc(d.method)}">${esc(METHOD_TEXT[d.method] || '')}</p>
+      <div id="imp-messages">${messagesHtml(d)}</div>
+      <div class="review">
+        <section class="preview" aria-labelledby="pv-h">
+          <h2 id="pv-h">Preview</h2>
+          <div id="preview"></div>
+        </section>
+        <section class="edit" aria-labelledby="ed-h">
+          <h2 id="ed-h">Recipe file</h2>
+          <p class="hint">Fix anything that's wrong here, then update the preview. The format is described in docs/recipe-format.md.</p>
+          <textarea id="imp-json" spellcheck="false" autocapitalize="none" rows="22" aria-labelledby="ed-h">${esc(d.text)}</textarea>
+          <button class="button secondary" data-action="imp-preview">Update preview</button>
+        </section>
+      </div>
+      <div class="save-bar">
+        <label for="imp-slug">File name</label>
+        <div class="slug-field"><input id="imp-slug" value="${esc(d.slug)}" autocapitalize="none" spellcheck="false"><span>.json</span></div>
+        <p class="hint">Lowercase letters, numbers and hyphens. This becomes the recipe's address, so pick it once.</p>
+        <div class="actions">
+          <button class="button" data-action="imp-save"${d.saving ? ' disabled' : ''}>Save recipe</button>
+          <button class="button secondary" data-action="imp-reset">Start over</button>
+        </div>
+        <div id="save-status" aria-live="polite">${saveStatusHtml(d)}</div>
+      </div>`;
+  }
+
+  function messagesHtml(d) {
+    const list = (items) => `<ul>${items.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`;
+    return (d.errors.length ? `<div class="notice error"><p><strong>Fix these before saving:</strong></p>${list(d.errors)}</div>` : '') +
+      (d.warnings.length ? `<div class="notice"><p><strong>Worth checking:</strong></p>${list(d.warnings)}</div>` : '');
+  }
+
+  function saveStatusHtml(d) {
+    if (d.saving) return '<p class="working">Saving…</p>';
+    if (d.conflict) {
+      return `<p class="form-error">A recipe called "${esc(d.slug)}" already exists. Change the file name, or
+        <button class="link-button" data-action="imp-overwrite">replace the existing recipe</button>.</p>`;
+    }
+    return d.saveMsg ? `<p class="form-error">${esc(d.saveMsg)}</p>` : '';
+  }
+
+  function drawSaveStatus() {
+    const d = state.imp.draft;
+    const box = document.getElementById('save-status');
+    if (box && d) box.innerHTML = saveStatusHtml(d);
+    const btn = app.querySelector('[data-action="imp-save"]');
+    if (btn && d) btn.disabled = d.saving;
+  }
+
+  function drawPreview() {
+    const box = document.getElementById('preview');
+    const d = state.imp.draft;
+    if (!box || !d) return;
+    let raw;
+    try {
+      raw = JSON.parse(d.text);
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('The recipe must be a JSON object.');
+    } catch (e) {
+      box.innerHTML = `<p class="form-error">The JSON can't be read: ${esc(e.message)}</p>`;
+      return;
+    }
+    const r = normalizeRecipe(raw, (d.slug || 'recipe') + '.json');
+    box.innerHTML = `
+      <h3 class="pv-title">${esc(r.title)}</h3>
+      ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ''}
+      <p class="facts"><span>Serves ${esc(r.servings)}</span>${r.time ? `<span>${esc(r.time)}</span>` : ''}${r.tags.length ? `<span>${r.tags.map(esc).join(', ')}</span>` : ''}</p>
+      ${r.groups.map((g) => `
+        <div class="group">
+          ${g.name ? `<h4>${esc(g.name)}</h4>` : ''}
+          <ul>${g.items.map((it) => `<li><span class="amt">${esc(amountText(it, 1, state.units))}</span> ${esc(it.name)}${it.note ? `<span class="note">, ${esc(it.note)}</span>` : ''}</li>`).join('')}</ul>
+        </div>`).join('')}
+      <ol class="pv-steps">${r.steps.map((s) => `<li>${s.title ? `<strong>${esc(s.title)}.</strong> ` : ''}${esc(s.text)}${s.timer ? ` <span class="note">(timer: ${esc(fmtDuration(s.timer))})</span>` : ''}</li>`).join('')}</ol>
+      ${r.notes.length ? `<h4>Notes</h4><ul>${r.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+      ${r.source ? `<p class="source">Source: ${esc(r.source)}</p>` : ''}`;
+  }
+
+  async function saveDraft(overwrite) {
+    const d = state.imp.draft;
+    if (!d || d.saving) return;
+    d.conflict = false;
+    d.saveMsg = '';
+
+    let recipe;
+    try {
+      recipe = JSON.parse(d.text);
+    } catch (e) {
+      d.saveMsg = `The JSON can't be read: ${e.message}`;
+      drawSaveStatus();
+      return;
+    }
+    const slug = d.slug.trim();
+    if (!SLUG_RE.test(slug) || slug === 'index') {
+      d.saveMsg = 'Use lowercase letters, numbers and single hyphens for the file name, such as "garlic-tomato-spaghetti".';
+      drawSaveStatus();
+      return;
+    }
+
+    d.saving = true;
+    drawSaveStatus();
+    try {
+      await api('recipes', { method: 'POST', json: { slug, recipe, overwrite: overwrite === true } });
+      state.imp = { busy: false, error: '', draft: null };
+      await loadRecipes();
+      location.hash = '#/r/' + encodeURIComponent(slug);
+      return;
+    } catch (e) {
+      d.saving = false;
+      if (e.status === 409) d.conflict = true;
+      else if (e.status === 401) {
+        state.user = null;
+        state.imp.error = 'Your session ended. Sign in again; your draft is kept.';
+        showImport();
+        return;
+      } else {
+        d.saveMsg = e.message;
+        if (e.status === 422 && e.data && e.data.errors) {
+          d.errors = e.data.errors;
+          d.warnings = e.data.warnings || [];
+          const m = document.getElementById('imp-messages');
+          if (m) m.innerHTML = messagesHtml(d);
+        }
+      }
+    }
+    drawSaveStatus();
+  }
+
+  async function login(form) {
+    const status = document.getElementById('login-status');
+    const btn = form.querySelector('button');
+    btn.disabled = true;
+    status.textContent = '';
+    try {
+      const data = await api('login', { method: 'POST', json: { username: form.elements.username.value, password: form.elements.password.value } });
+      state.user = data.user;
+      state.imp.error = '';
+      showImport();
+    } catch (e) {
+      status.textContent = e.message;
+      btn.disabled = false;
+      form.elements.password.value = '';
+      form.elements.password.focus();
+    }
+  }
+
+  async function logout() {
+    try { await api('logout', { method: 'POST' }); } catch (e) { /* signed out locally anyway */ }
+    state.user = null;
+    state.imp = { busy: false, error: '', draft: null };
+    if (location.hash === '#/import') location.hash = '#/';
+    else route(); // signed out from the home page footer: no hash change, so redraw directly
+  }
+
   /* ---------- routing ---------- */
 
   function leaveRecipe() {
@@ -623,6 +969,8 @@
       let slug = m[1];
       try { slug = decodeURIComponent(slug); } catch (e) { /* keep raw */ }
       showRecipe(slug);
+    } else if (location.hash === '#/import') {
+      showImport();
     } else {
       showHome();
     }
@@ -654,8 +1002,54 @@
       case 'step': toggleStep(el); break;
       case 'timer-start': startTimer(el.dataset.i); break;
       case 'timer-stop': stopTimer(el.dataset.i); break;
+      case 'logout': logout(); break;
+      case 'imp-preview': drawPreview(); break;
+      case 'imp-save': saveDraft(false); break;
+      case 'imp-overwrite': saveDraft(true); break;
+      case 'imp-reset':
+        state.imp = { busy: false, error: '', draft: null };
+        drawImport();
+        break;
       default: break;
     }
+  });
+
+  app.addEventListener('submit', (e) => {
+    const form = e.target.closest('form[data-action]');
+    if (!form) return;
+    e.preventDefault();
+    switch (form.dataset.action) {
+      case 'login': login(form); break;
+      case 'import-file': importFile(form.elements.file.files[0]); break;
+      case 'import-url': runImport({ url: form.elements.url.value.trim() }); break;
+      case 'import-text': runImport({ text: form.elements.text.value }); break;
+      default: break;
+    }
+  });
+
+  // Drag and drop onto the "From a file" box: a file, or a link dragged from another tab
+  app.addEventListener('dragover', (e) => {
+    const zone = e.target.closest('[data-drop]');
+    if (!zone || state.imp.busy) return;
+    e.preventDefault();
+    zone.classList.add('over');
+  });
+
+  app.addEventListener('dragleave', (e) => {
+    const zone = e.target.closest('[data-drop]');
+    if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove('over');
+  });
+
+  app.addEventListener('drop', (e) => {
+    const zone = e.target.closest('[data-drop]');
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.remove('over');
+    if (state.imp.busy) return;
+    const file = e.dataTransfer.files[0];
+    const link = (e.dataTransfer.getData('text/uri-list') || '').split('\n').find((l) => /^https?:\/\//i.test(l.trim()));
+    if (file) importFile(file);
+    else if (link) runImport({ url: link.trim() });
   });
 
   app.addEventListener('change', (e) => {
@@ -672,10 +1066,21 @@
     if (e.target.id === 'search') {
       state.query = e.target.value;
       drawList();
+    } else if (e.target.id === 'imp-json' && state.imp.draft) {
+      state.imp.draft.text = e.target.value;
+    } else if (e.target.id === 'imp-slug' && state.imp.draft) {
+      state.imp.draft.slug = e.target.value;
+      state.imp.draft.conflict = false;
+      drawSaveStatus();
     }
   });
 
   window.addEventListener('hashchange', route);
 
   loadRecipes().then(route);
+  // Sign-in state is loaded separately so it never holds up the recipe list
+  loadUser().then(() => {
+    if (location.hash === '#/import') route();
+    else drawAccount();
+  });
 })();
