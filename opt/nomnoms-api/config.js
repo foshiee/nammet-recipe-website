@@ -10,7 +10,7 @@ export const config = {
   host: env.HOST || '127.0.0.1',
   port: num(env.PORT, 3000),
 
-  recipesDir: env.RECIPES_DIR || '/var/www/recipes/recipes',
+  recipesDir: env.RECIPES_DIR || '/var/www/nomnoms/recipes',
   usersFile: env.USERS_FILE || '/var/lib/nomnoms/users.json',
 
   // TLS ends at Traefik, so the service can't tell whether the browser used HTTPS.

@@ -8,23 +8,23 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 
 | Repo path | Deployed to | Purpose |
 |---|---|---|
-| `var/www/recipes/index.html` | `/var/www/recipes/` | Shell page: a `<main id="app">` plus `app.js` (deferred). |
-| `var/www/recipes/app.js` | same | The entire front end (one IIFE), including the sign-in and import screens. |
-| `var/www/recipes/style.css` | same | All styling; light/dark via `prefers-color-scheme` and CSS variables in `:root`. |
-| `var/www/recipes/recipes/*.json` | same | Recipe data served to the browser. Only `example-recipe.json` is tracked. |
+| `var/www/nomnoms/index.html` | `/var/www/nomnoms/` | Shell page: a `<main id="app">` plus `app.js` (deferred). |
+| `var/www/nomnoms/app.js` | same | The entire front end (one IIFE), including the sign-in and import screens. |
+| `var/www/nomnoms/style.css` | same | All styling; light/dark via `prefers-color-scheme` and CSS variables in `:root`. |
+| `var/www/nomnoms/recipes/*.json` | same | Recipe data served to the browser. Only `example-recipe.json` is tracked. |
 | `opt/nomnoms-api/` | `/opt/nomnoms-api/` | Node service for login and import, proxied at `/api/`. See below. |
-| `etc/nginx/conf.d/nginx-recipes.conf` | `/etc/nginx/conf.d/recipes.conf` | Server block (note the rename on deploy). |
+| `etc/nginx/conf.d/nginx-nomnoms.conf` | `/etc/nginx/conf.d/nomnoms.conf` | Server block (note the rename on deploy). |
 | `etc/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Stock RHEL-style main config; includes `conf.d/*.conf`. |
 | `etc/systemd/system/nomnoms-api.service` | same | systemd unit for the service, which can write only to the recipes folder. |
 | `etc/nomnoms/api.env.example` | `/etc/nomnoms/api.env` | Service settings, including `ANTHROPIC_API_KEY`. The real file is never committed. |
 | `docs/recipe-format.md` | n/a | Authoritative recipe JSON spec. |
 | `docs/import-setup.md` | n/a | Deploying and running the import service, plus the security checklist. |
-| `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/recipes/recipes/`; keep both in sync. |
+| `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
 
 ## Running and testing
 
-The front end has nothing to build. The easiest local setup is the API's dev mode, which serves `var/www/recipes/` and emulates nginx's JSON listing (commands in `docs/import-setup.md`, "Trying it locally"). A plain `python -m http.server` doesn't return a JSON listing for `recipes/`, so the app reports "Couldn't load the recipe list" unless an `index.json` exists. Validate a recipe file with `python3 -m json.tool file.json`.
+The front end has nothing to build. The easiest local setup is the API's dev mode, which serves `var/www/nomnoms/` and emulates nginx's JSON listing (commands in `docs/import-setup.md`, "Trying it locally"). A plain `python -m http.server` doesn't return a JSON listing for `recipes/`, so the app reports "Couldn't load the recipe list" unless an `index.json` exists. Validate a recipe file with `python3 -m json.tool file.json`.
 
 Backend tests: `cd opt/nomnoms-api && npm test` (Node's built-in runner, no network or API key needed).
 
@@ -54,7 +54,7 @@ Node 20+, ES modules, two dependencies (`@anthropic-ai/sdk`, `busboy`). Settings
 
 ## nginx
 
-`nginx-recipes.conf` is a `default_server` on port 80 with root `/var/www/recipes`. `/` uses `try_files` with `Cache-Control: no-cache`. `/recipes/` enables `autoindex on; autoindex_format json;`, which is what lets new recipe files (including imported ones) appear on a page refresh without editing code or reloading nginx. Removing that block breaks recipe discovery (only the `index.json` fallback remains). `/api/` proxies to the service on `127.0.0.1:3000`. HTTPS ends at a Traefik reverse proxy in front of nginx; the commented `set_real_ip_from` lines must name Traefik's address so rate limiting sees real client IPs.
+`nginx-nomnoms.conf` is a `default_server` on port 80 with root `/var/www/nomnoms`. `/` uses `try_files` with `Cache-Control: no-cache`. `/recipes/` enables `autoindex on; autoindex_format json;`, which is what lets new recipe files (including imported ones) appear on a page refresh without editing code or reloading nginx. Removing that block breaks recipe discovery (only the `index.json` fallback remains). `/api/` proxies to the service on `127.0.0.1:3000`. HTTPS ends at a Traefik reverse proxy in front of nginx; the commented `set_real_ip_from` lines must name Traefik's address so rate limiting sees real client IPs.
 
 ## Conventions
 

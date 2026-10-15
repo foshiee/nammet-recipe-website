@@ -4,7 +4,7 @@ Each recipe on the site is one JSON file in the `recipes/` folder. The site list
 
 ## File location and naming
 
-Recipe files go in `/var/www/recipes/recipes/` on the web server. A new file shows up after a page refresh; nginx does not need a reload.
+Recipe files go in `/var/www/nomnoms/recipes/` on the web server. A new file shows up after a page refresh; nginx does not need a reload.
 
 You can also sign in (link at the bottom of the home page) and use the **Import recipe** button. It converts a recipe file, web page, PDF, photo or pasted text into this format, lets you check and edit the result, and saves it in this folder. Setup is described in [import-setup.md](import-setup.md).
 

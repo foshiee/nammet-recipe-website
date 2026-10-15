@@ -7,10 +7,10 @@ The static site still works without any of this. If the import service is down, 
 ## How it works
 
 ```
-browser ──HTTPS──> Traefik ──HTTP──> nginx :80 ──> /var/www/recipes        (static site, as before)
+browser ──HTTPS──> Traefik ──HTTP──> nginx :80 ──> /var/www/nomnoms        (static site, as before)
                                           └─ /api/ ──> nomnoms-api :3000   (Node, 127.0.0.1 only)
                                                           ├─ reads  /var/lib/nomnoms/users.json
-                                                          ├─ writes /var/www/recipes/recipes/<name>.json
+                                                          ├─ writes /var/www/nomnoms/recipes/<name>.json
                                                           └─ calls  api.anthropic.com (only when needed)
 ```
 
@@ -50,8 +50,8 @@ The repo mirrors the server's layout, so one archive carries everything. In Powe
 
 ```powershell
 tar -czf nomnoms-deploy.tgz --exclude=node_modules --exclude=dev-users.json `
-  opt/nomnoms-api etc/nomnoms etc/systemd etc/nginx/conf.d/nginx-recipes.conf `
-  var/www/recipes/index.html var/www/recipes/app.js var/www/recipes/style.css
+  opt/nomnoms-api etc/nomnoms etc/systemd etc/nginx/conf.d/nginx-nomnoms.conf `
+  var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css
 scp nomnoms-deploy.tgz you@your-vm:~/
 ```
 
@@ -74,8 +74,8 @@ find . -type f \( -name '*.js' -o -name '*.json' -o -name '*.html' -o -name '*.c
 This adds the Import recipe button and the sign-in and import screens. Your recipes folder is untouched.
 
 ```sh
-sudo install -m 0644 var/www/recipes/index.html var/www/recipes/app.js var/www/recipes/style.css /var/www/recipes/
-sudo restorecon -v /var/www/recipes/*.html /var/www/recipes/*.js /var/www/recipes/*.css   # SELinux labels
+sudo install -m 0644 var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css /var/www/nomnoms/
+sudo restorecon -v /var/www/nomnoms/*.html /var/www/nomnoms/*.js /var/www/nomnoms/*.css   # SELinux labels
 ```
 
 ### 4. Create the service account and its data folder
@@ -100,7 +100,7 @@ cd /opt/nomnoms-api && sudo npm ci --omit=dev && cd -
 This adds write access for `nomnoms` without changing who owns the folder, so you can still copy files in by hand:
 
 ```sh
-sudo setfacl -m u:nomnoms:rwx /var/www/recipes/recipes
+sudo setfacl -m u:nomnoms:rwx /var/www/nomnoms/recipes
 ```
 
 ### 7. Configuration
@@ -146,9 +146,11 @@ sudo setsebool -P httpd_can_network_connect 1
 ### 11. nginx
 
 ```sh
-sudo cp /etc/nginx/conf.d/recipes.conf /etc/nginx/conf.d/recipes.conf.bak
-sudo install -m 0644 etc/nginx/conf.d/nginx-recipes.conf /etc/nginx/conf.d/recipes.conf
-sudo nano /etc/nginx/conf.d/recipes.conf     # set Traefik's address, uncomment the three real-IP lines
+# Older installs used recipes.conf. Move it out of conf.d, or nginx sees two default servers.
+[ -f /etc/nginx/conf.d/recipes.conf ] && sudo mv /etc/nginx/conf.d/recipes.conf /root/recipes.conf.bak
+[ -f /etc/nginx/conf.d/nomnoms.conf ] && sudo cp /etc/nginx/conf.d/nomnoms.conf /root/nomnoms.conf.bak
+sudo install -m 0644 etc/nginx/conf.d/nginx-nomnoms.conf /etc/nginx/conf.d/nomnoms.conf
+sudo nano /etc/nginx/conf.d/nomnoms.conf     # set Traefik's address, uncomment the three real-IP lines
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -224,10 +226,10 @@ On your own machine, no nginx is needed. The service can serve the site too, and
 cd opt/nomnoms-api
 npm install
 USERS_FILE=./dev-users.json node tools/add-user.js tester
-USERS_FILE=./dev-users.json RECIPES_DIR=../../var/www/recipes/recipes \
-  DEV_STATIC_ROOT=../../var/www/recipes COOKIE_SECURE=false node server.js
+USERS_FILE=./dev-users.json RECIPES_DIR=../../var/www/nomnoms/recipes \
+  DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
 ```
 
-Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/recipes/recipes/` folder, so delete any test recipes before committing. `dev-users.json` is gitignored.
+Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nomnoms/recipes/` folder, so delete any test recipes before committing. `dev-users.json` is gitignored.
 
 Tests for the parts that don't need Claude: `npm test`.

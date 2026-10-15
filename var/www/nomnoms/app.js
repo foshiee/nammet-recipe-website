@@ -279,11 +279,11 @@
   /* ---------- home view ---------- */
 
   function showHome() {
-    document.title = 'Recipes';
+    document.title = 'Tasty Nomnoms';
 
     if (state.loadFailed) {
       app.innerHTML = `
-        <h1>Recipes</h1>
+        <h1>Tasty Nomnoms</h1>
         <div class="notice">
           <p><strong>Couldn't load the recipe list.</strong></p>
           <p>The site looks for a <code>recipes/</code> folder next to this page. Check that it exists and that nginx has <code>autoindex on; autoindex_format json;</code> set for <code>/recipes/</code>.</p>
@@ -299,7 +299,7 @@
     app.innerHTML = `
       <section class="home">
         <div class="home-head">
-          <h1>Recipes</h1>
+          <h1>Tasty Nomnoms</h1>
           <div id="account-head"></div>
         </div>
         ${n ?`<p class="count">${n} ${n === 1 ? 'recipe' : 'recipes'}</p>
@@ -373,7 +373,7 @@
   function showRecipe(slug) {
     const r = state.recipes.find((x) => x.slug === slug);
     if (!r) {
-      document.title = 'Recipe not found | Recipes';
+      document.title = 'Recipe not found | Tasty Nomnoms';
       app.innerHTML = `
         <a class="back" href="#/">All recipes</a>
         <div class="notice"><p><strong>That recipe doesn't exist.</strong></p><p>It may have been renamed or removed.</p></div>`;
@@ -384,7 +384,7 @@
     state.servings = r.servings;
     state.checked = new Set();
     state.timers = {};
-    document.title = r.title + ' | Recipes';
+    document.title = r.title + ' | Tasty Nomnoms';
 
     const wakeSupported = 'wakeLock' in navigator;
     const source = r.source
@@ -671,7 +671,7 @@
   };
 
   function showImport() {
-    document.title = 'Import a recipe | Recipes';
+    document.title = 'Import a recipe | Tasty Nomnoms';
 
     if (!state.userKnown) {
       app.innerHTML = '<p class="status">Checking sign-in…</p>';
