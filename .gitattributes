@@ -1,0 +1,12 @@
+# Everything deploys to Linux, so text files use LF everywhere,
+# including Windows working copies (overrides core.autocrlf).
+* text=auto eol=lf
+
+# Binary files: never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
