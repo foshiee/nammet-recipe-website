@@ -3,7 +3,7 @@
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 
 - **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check and edit it, and save it straight into the recipes folder. It appears on the site immediately.
-- **Admin** (admins only), also at `#/admin`: change the site name, icon, colours (light and dark), fonts and corner style; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
+- **Admin** (admins only), also at `#/admin`: change the site name, icon, colours (light and dark), fonts and corner rounding; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
 
 There are two roles. **Admins** can do everything. **Importers** can only import recipes. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
 
@@ -276,7 +276,7 @@ What the service does to protect itself:
 - Recipe files are written atomically and never overwrite an existing recipe unless you confirm.
 - Admin routes need the admin role, and import routes need the importer or admin role. Role changes and removals apply to open sessions straight away, and a password reset signs that user out everywhere.
 - An API key saved on the admin page is stored in `/var/lib/nomnoms/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
-- Only checked values reach the public `theme/` folder: colours must be hex codes, fonts and corner styles come from fixed lists, and icons must be PNG, ICO or WebP (SVG uploads are refused).
+- Only checked values reach the public `theme/` folder: colours must be hex codes, fonts come from a fixed list, corner rounding must be a whole number of pixels from 0 to 24, and icons must be PNG, ICO or WebP (SVG uploads are refused).
 - systemd limits the service to writing in the recipes folder, the theme folder and `/var/lib/nomnoms`.
 
 ## Day to day

@@ -150,7 +150,7 @@ function adminSettings() {
     options: {
       colors: settings.COLORS,
       fonts: settings.FONTS,
-      radii: settings.RADII,
+      radius: settings.RADIUS,
       models: settings.MODELS,
       efforts: settings.EFFORTS,
       roles: auth.ROLES

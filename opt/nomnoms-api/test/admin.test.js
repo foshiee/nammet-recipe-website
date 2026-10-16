@@ -36,7 +36,11 @@ test('appearance validation', () => {
   assert.throws(() => settings.validateAppearance(injected), /colour/);
 
   assert.throws(() => settings.validateAppearance(appearance({ fonts: { heading: 'Comic Sans', body: 'system-sans' } })), /font/);
-  assert.throws(() => settings.validateAppearance(appearance({ radius: '3px' })), /corner/);
+  for (const radius of ['3px', '8', 3.5, -1, 25]) {
+    assert.throws(() => settings.validateAppearance(appearance({ radius })), /Corner/);
+  }
+  assert.equal(settings.validateAppearance(appearance({ radius: 0 })).radius, 0);
+  assert.equal(settings.validateAppearance(appearance({ radius: 24 })).radius, 24);
   assert.throws(() => settings.validateAppearance(appearance({ siteName: 'x'.repeat(61) })), /site name/);
   assert.throws(() => settings.validateAppearance(appearance({ siteName: '   ' })), /site name/);
   assert.throws(() => settings.validateAppearance(appearance({ favicon: { type: 'emoji', value: 'way too long here' } })), /icon/);
@@ -65,7 +69,7 @@ test('favicon sniffing', () => {
 });
 
 test('saving appearance writes the public theme files', async () => {
-  await settings.saveAppearance(appearance({ siteName: 'Our Kitchen', favicon: { type: 'emoji', value: '🥕' }, radius: 'round' }));
+  await settings.saveAppearance(appearance({ siteName: 'Our Kitchen', favicon: { type: 'emoji', value: '🥕' }, radius: 14 }));
   const site = JSON.parse(await fs.readFile(path.join(process.env.THEME_DIR, 'site.json'), 'utf8'));
   assert.equal(site.name, 'Our Kitchen');
   assert.match(site.favicon, /^theme\/favicon\.svg\?v=[0-9a-f]+$/);
@@ -80,6 +84,15 @@ test('saving appearance writes the public theme files', async () => {
 
   const saved = JSON.parse(await fs.readFile(process.env.SETTINGS_FILE, 'utf8'));
   assert.equal(saved.appearance.siteName, 'Our Kitchen');
+});
+
+test('a corner style saved before the slider still loads', async () => {
+  const saved = JSON.parse(await fs.readFile(process.env.SETTINGS_FILE, 'utf8'));
+  saved.appearance.radius = 'subtle';
+  await fs.writeFile(process.env.SETTINGS_FILE, JSON.stringify(saved));
+  await settings.loadSettings();
+  assert.equal(settings.appearance().radius, 4);
+  assert.equal(settings.appearance().siteName, 'Our Kitchen');
 });
 
 test('claude settings: admin page overrides the environment', async () => {

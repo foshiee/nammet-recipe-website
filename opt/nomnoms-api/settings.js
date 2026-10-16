@@ -7,7 +7,7 @@
 //   site.json    { name, favicon } read by app.js
 //   favicon.*    an SVG made from the chosen emoji, or the uploaded image
 //
-// Only whitelisted values ever reach theme.css (hex colours, font and radius keys),
+// Only checked values ever reach theme.css (hex colours, font keys, a whole-pixel radius),
 // which is what keeps the generated CSS safe.
 
 import crypto from 'node:crypto';
@@ -49,12 +49,10 @@ export const FONTS = {
   mono: { label: 'Monospace', stack: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace' }
 };
 
-export const RADII = {
-  square: { label: 'Square', value: '0px' },
-  subtle: { label: 'Subtle', value: '4px' },
-  default: { label: 'Rounded', value: '8px' },
-  round: { label: 'Very rounded', value: '14px' }
-};
+// Corner rounding in whole pixels
+export const RADIUS = { min: 0, max: 24 };
+// Settings saved before the slider used these named corner styles
+const LEGACY_RADII = { square: 0, subtle: 4, default: 8, round: 14 };
 
 export const MODELS = ['claude-sonnet-5-5', 'claude-opus-5-5'];
 export const EFFORTS = ['low', 'medium', 'high'];
@@ -68,7 +66,7 @@ export const DEFAULT_APPEARANCE = {
     dark: { bg: '#0e1519', ink: '#e8efec', muted: '#9aaca8', line: '#2a3a3f', accent: '#8eaaff', 'on-accent': '#0e1519', tint: '#1b2845', field: '#131d22', danger: '#ff8a80' }
   },
   fonts: { heading: 'classic-serif', body: 'system-sans' },
-  radius: 'default'
+  radius: 8
 };
 
 const DEFAULTS = { appearance: DEFAULT_APPEARANCE, ai: { model: null, effort: null }, apiKey: null };
@@ -120,8 +118,9 @@ export function validateAppearance(input, current = DEFAULT_APPEARANCE) {
     out.fonts[which] = v;
   }
 
-  if (!Object.hasOwn(RADII, input.radius)) throw new SettingsError('Unknown corner style.');
-  out.radius = input.radius;
+  const r = input.radius;
+  if (!Number.isInteger(r) || r < RADIUS.min || r > RADIUS.max) throw new SettingsError(`Corner rounding must be a whole number from ${RADIUS.min} to ${RADIUS.max}.`);
+  out.radius = r;
   return out;
 }
 
@@ -146,7 +145,7 @@ export function renderThemeCss(a) {
 ${vars(a.colors.light)}
   --font-heading: ${FONTS[a.fonts.heading].stack};
   --font-body: ${FONTS[a.fonts.body].stack};
-  --radius: ${RADII[a.radius].value};
+  --radius: ${a.radius}px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -207,6 +206,7 @@ let current = clone(DEFAULTS);
 function merge(saved) {
   const s = clone(DEFAULTS);
   if (saved.appearance) {
+    if (Object.hasOwn(LEGACY_RADII, saved.appearance.radius)) saved.appearance.radius = LEGACY_RADII[saved.appearance.radius];
     try {
       s.appearance = validateAppearance({ ...DEFAULT_APPEARANCE, ...saved.appearance }, saved.appearance);
     } catch (e) {

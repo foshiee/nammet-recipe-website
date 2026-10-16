@@ -1111,7 +1111,10 @@
         <select id="ad-body" name="body">${options(o.fonts, look.fonts.body)}</select>
         <p class="hint">Fonts already on your visitors' devices, so nothing extra is downloaded. Each device shows its closest match.</p>
         <label for="ad-radius">Corners</label>
-        <select id="ad-radius" name="radius">${options(o.radii, look.radius)}</select>
+        <div class="range-row">
+          <input id="ad-radius" type="range" name="radius" min="${o.radius.min}" max="${o.radius.max}" step="1" value="${look.radius}">
+          <output id="ad-radius-out" for="ad-radius">${look.radius}px</output>
+        </div>
         <div class="actions">
           <button class="button" type="submit">Save appearance</button>
           <button class="button secondary" type="button" data-action="admin-look-undo">Undo changes</button>
@@ -1140,7 +1143,7 @@
       for (const k of Object.keys(look.colors[scheme])) look.colors[scheme][k] = f[scheme + ':' + k].value;
     }
     look.fonts = { heading: f.heading.value, body: f.body.value };
-    look.radius = f.radius.value;
+    look.radius = Number(f.radius.value);
     return look;
   }
 
@@ -1154,7 +1157,9 @@
     for (const [k, v] of Object.entries(a.look.colors[scheme])) root.setProperty('--' + k, v);
     root.setProperty('--font-heading', o.fonts[a.look.fonts.heading].stack);
     root.setProperty('--font-body', o.fonts[a.look.fonts.body].stack);
-    root.setProperty('--radius', o.radii[a.look.radius].value);
+    root.setProperty('--radius', a.look.radius + 'px');
+    const out = document.getElementById('ad-radius-out');
+    if (out) out.textContent = a.look.radius + 'px';
   }
 
   function clearPreview() {

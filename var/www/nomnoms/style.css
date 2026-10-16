@@ -574,6 +574,9 @@ h2 {
 .admin-form + .admin-form { margin-top: 2rem; }
 .admin-form > label { margin-top: .75rem; font-weight: 600; }
 .admin-form > select { justify-self: start; }
+.range-row { display: flex; align-items: center; gap: .75rem; }
+.range-row input[type="range"] { flex: 1; max-width: 20rem; accent-color: var(--accent); }
+.range-row output { min-width: 3.5em; font-variant-numeric: tabular-nums; }
 .admin-form h3 { margin: 0; font-family: var(--font-heading); font-size: 1.15rem; }
 
 .key-status { margin: .5rem 0 0; }
