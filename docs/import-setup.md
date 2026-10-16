@@ -266,6 +266,15 @@ Traefik ends HTTPS, so passwords and session cookies are encrypted between the b
 - **Traefik redirects HTTP to HTTPS** for this site's router.
 - **The Traefik to nginx hop stays on a trusted network**, such as the same host, a Docker network or your LAN.
 - **The real-IP lines in the nginx config are filled in.** Without them, the login rate limit and the recipe-file rate limit count all visitors as one, so failed logins from anyone lock everyone out for 15 minutes, and a busy evening can get everyone a 429.
+- **Behind Cloudflare, nginx trusts Cloudflare's ranges too.** Otherwise the first column of `access.log` shows Cloudflare addresses (such as `172.70.x.x`) instead of visitors, and the rate limits count per Cloudflare server. Write the ranges to a file, then uncomment the `include` line under the real-IP lines in `nomnoms.conf`:
+
+  ```sh
+  { curl -s https://www.cloudflare.com/ips-v4; echo; curl -s https://www.cloudflare.com/ips-v6; echo; } \
+    | grep -E '^[0-9a-f]' | sed 's/.*/set_real_ip_from &;/' | sudo tee /etc/nginx/cloudflare-ips.inc
+  sudo nginx -t && sudo systemctl reload nginx
+  ```
+
+  Cloudflare appends the address that connected to it, so visitors can't fake their way past this. The ranges change rarely; re-run the command every few months.
 - **`COOKIE_SECURE=true`** in `/etc/nomnoms/api.env`, which is the default.
 
 What the service does to protect itself:
