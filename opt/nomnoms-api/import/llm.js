@@ -6,7 +6,6 @@
 // import, and the user reviews it before anything is saved.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { config } from '../config.js';
 import { aiConfig, keyStatus } from '../settings.js';
 import { toAmount, normalizeFractions, canonicalUnit } from './ingredient.js';
 
@@ -194,7 +193,7 @@ function toRecipe(out) {
 // input: { kind: 'pdf' | 'image' | 'text' | 'html', buffer?, mediaType?, text?, url? }
 export async function extractWithClaude(input) {
   requireKey();
-  const { model, effort } = aiConfig();
+  const { model, effort, fallbacks } = aiConfig();
 
   const params = {
     model,
@@ -206,9 +205,8 @@ export async function extractWithClaude(input) {
 
   let res;
   try {
-    // Server-side fallbacks retry a safety-classifier refusal on a suitable model within the same call.
-    // Haiku models have none, so the parameter is left off for them.
-    res = config.aiFallbacks && !model.startsWith('claude-haiku')
+    // Server-side fallbacks retry a safety-classifier refusal on a suitable model within the same call
+    res = fallbacks
       ? await getClient().beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
       : await getClient().messages.create(params);
   } catch (e) {

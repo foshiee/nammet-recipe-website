@@ -140,6 +140,9 @@ test('claude settings: admin page overrides the environment', async () => {
   await settings.saveAi({ model: 'claude-opus-5-5', effort: null });
   assert.equal(settings.aiConfig().model, 'claude-opus-5-5');
   assert.equal(settings.aiConfig().effort, 'medium');
+  assert.equal(settings.aiConfig().fallbacks, true);
+  await settings.saveAi({ model: 'claude-haiku-5-5', effort: null });
+  assert.equal(settings.aiConfig().fallbacks, false);
   assert.throws(() => settings.validateAi({ model: 'gpt-4' }), /model/);
 });
 

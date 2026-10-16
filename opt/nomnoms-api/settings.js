@@ -364,11 +364,14 @@ export function appearance() {
 }
 
 // What the Claude import uses. The admin page wins over api.env.
+// Haiku models have no server-side fallbacks, so they're off for them whatever AI_FALLBACKS says.
 export function aiConfig() {
+  const model = current.ai.model || config.model;
   return {
     apiKey: current.apiKey || config.apiKey || null,
-    model: current.ai.model || config.model,
-    effort: current.ai.effort || config.effort
+    model,
+    effort: current.ai.effort || config.effort,
+    fallbacks: config.aiFallbacks && !model.startsWith('claude-haiku')
   };
 }
 
