@@ -128,7 +128,7 @@ The steps below run from this folder. The repo's `.gitattributes` makes every ch
 
 ```sh
 sudo install -d -m 0755 /var/www/nomnoms /var/www/nomnoms/recipes
-sudo install -m 0644 var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css /var/www/nomnoms/
+sudo install -m 0644 var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css var/www/nomnoms/robots.txt /var/www/nomnoms/
 sudo restorecon -Rv /var/www/nomnoms   # SELinux labels
 ```
 
