@@ -15,7 +15,7 @@
 //
 // Admins only:
 //   GET  /api/admin/settings       -> appearance, Claude settings (never the key itself), options
-//   POST /api/admin/appearance     { siteName, favicon, colors, fonts, radius }
+//   POST /api/admin/appearance     { siteName, favicon, theme, colors, fonts, radius }
 //   POST /api/admin/favicon        multipart "file" (PNG, ICO or WebP)
 //   POST /api/admin/ai             { model, effort } (null = server default)
 //   POST /api/admin/api-key        { key } (empty removes it)
@@ -154,6 +154,8 @@ function adminSettings() {
     ai: { ...settings.aiSettings(), key: settings.keyStatus() },
     options: {
       colors: settings.COLORS,
+      themes: settings.THEMES,
+      contrast: settings.CONTRAST,
       fonts: settings.FONTS,
       radius: settings.RADIUS,
       models: settings.MODELS,

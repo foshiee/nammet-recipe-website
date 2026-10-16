@@ -48,6 +48,31 @@ test('appearance validation', () => {
   assert.throws(() => settings.validateAppearance(appearance({ favicon: { type: 'image', file: '../../etc/passwd' } })), /icon/);
 });
 
+test('colour themes and contrast', () => {
+  for (const [key, theme] of Object.entries(settings.THEMES)) {
+    assert.deepEqual(Object.keys(theme.colors.light).sort(), Object.keys(settings.COLORS).sort(), key);
+    for (const scheme of ['light', 'dark']) {
+      for (const p of settings.CONTRAST.pairs) {
+        const ratio = settings.contrastRatio(theme.colors[scheme][p.fg], theme.colors[scheme][p.bg]);
+        assert.ok(ratio >= settings.CONTRAST.warn, `${key} ${scheme}: ${p.label} is ${ratio.toFixed(2)}:1`);
+      }
+    }
+    const a = settings.validateAppearance(appearance({ theme: key, colors: structuredClone(theme.colors) }));
+    assert.equal(a.theme, key);
+  }
+  assert.equal(settings.contrastRatio('#000000', '#ffffff').toFixed(1), '21.0');
+  assert.throws(() => settings.validateAppearance(appearance({ theme: 'neon' })), /theme/);
+
+  // A tweaked theme keeps its name; an unreadable one can't be saved
+  const tweaked = appearance({ theme: 'sage' });
+  tweaked.colors.light.accent = '#1d4ed8';
+  assert.equal(settings.validateAppearance(tweaked).theme, 'sage');
+  const unreadable = appearance();
+  unreadable.colors.dark.ink = '#20282c';
+  assert.throws(() => settings.validateAppearance(unreadable), /Text on the page in dark mode is too hard to read/);
+  assert.equal(settings.validateAppearance(unreadable, undefined, { checkContrast: false }).colors.dark.ink, '#20282c');
+});
+
 test('theme css and favicon', () => {
   const css = settings.renderThemeCss(settings.DEFAULT_APPEARANCE);
   assert.match(css, /--accent: #2447b8;/);
@@ -89,10 +114,15 @@ test('saving appearance writes the public theme files', async () => {
 test('a corner style saved before the slider still loads', async () => {
   const saved = JSON.parse(await fs.readFile(process.env.SETTINGS_FILE, 'utf8'));
   saved.appearance.radius = 'subtle';
+  // Saved before themes and the contrast check existed
+  delete saved.appearance.theme;
+  saved.appearance.colors.light.muted = '#c0c0c0';
   await fs.writeFile(process.env.SETTINGS_FILE, JSON.stringify(saved));
   await settings.loadSettings();
   assert.equal(settings.appearance().radius, 4);
   assert.equal(settings.appearance().siteName, 'Our Kitchen');
+  assert.equal(settings.appearance().theme, 'sea-glass');
+  assert.equal(settings.appearance().colors.light.muted, '#c0c0c0');
 });
 
 test('claude settings: admin page overrides the environment', async () => {

@@ -1155,6 +1155,11 @@
       .map((k) => `<option value="${esc(k)}"${k === selected ? ' selected' : ''}>${esc(map[k].label)}</option>`).join('');
     const swatches = (scheme) => Object.keys(o.colors).map((k) => `
       <label class="swatch"><input type="color" name="${scheme}:${esc(k)}" value="${esc(look.colors[scheme][k])}"><span>${esc(o.colors[k])}</span></label>`).join('');
+    const sample = (c) => `<span class="theme-sample" style="background:${esc(c.bg)};color:${esc(c.ink)}">Aa<span style="background:${esc(c.accent)}"></span></span>`;
+    const themes = Object.keys(o.themes).map((k) => `
+      <label class="theme-card"><input type="radio" name="theme" value="${esc(k)}"${k === look.theme ? ' checked' : ''}>
+        <span class="theme-samples">${sample(o.themes[k].colors.light)}${sample(o.themes[k].colors.dark)}</span>
+        <span>${esc(o.themes[k].label)}</span></label>`).join('');
 
     box.innerHTML = `
       <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. Visitors see them once you save.</p>
@@ -1168,8 +1173,16 @@
           <input id="ad-emoji" name="emoji" value="${image ? '' : esc(look.favicon.value)}" placeholder="${image ? 'Using the uploaded image' : ''}">
         </div>
         <p class="hint">An emoji, or a letter or two.${image ? ' Leave it empty to keep the uploaded image.' : ''} To use a picture instead, upload one below.</p>
-        <fieldset class="colors"><legend>Colours in light mode</legend>${swatches('light')}</fieldset>
-        <fieldset class="colors"><legend>Colours in dark mode</legend>${swatches('dark')}</fieldset>
+        <fieldset class="themes"><legend>Colour theme</legend>${themes}</fieldset>
+        <p class="hint">Each theme has light and dark colours (shown left and right), used to match each visitor's device.</p>
+        <div id="look-theme"></div>
+        <details class="custom-colors"${themeChanged(look) ? ' open' : ''}>
+          <summary>Customise colours</summary>
+          <p class="hint">Fine-tune the chosen theme, for example to match a brand colour. Picking a theme again replaces these.</p>
+          <fieldset class="colors"><legend>Colours in light mode</legend>${swatches('light')}</fieldset>
+          <fieldset class="colors"><legend>Colours in dark mode</legend>${swatches('dark')}</fieldset>
+        </details>
+        <div id="look-contrast" aria-live="polite"></div>
         <label for="ad-heading">Heading font</label>
         <select id="ad-heading" name="heading">${options(o.fonts, look.fonts.heading)}</select>
         <label for="ad-body">Body font</label>
@@ -1204,6 +1217,7 @@
     const emoji = f.emoji.value.trim();
     const saved = state.admin.settings.appearance.favicon;
     look.favicon = emoji ? { type: 'emoji', value: emoji } : saved.type === 'image' ? saved : { type: 'emoji', value: '' };
+    look.theme = f.theme.value;
     for (const scheme of ['light', 'dark']) {
       for (const k of Object.keys(look.colors[scheme])) look.colors[scheme][k] = f[scheme + ':' + k].value;
     }
@@ -1225,6 +1239,73 @@
     root.setProperty('--radius', a.look.radius + 'px');
     const out = document.getElementById('ad-radius-out');
     if (out) out.textContent = a.look.radius + 'px';
+    drawThemeStatus();
+    drawContrast();
+  }
+
+  // Picking a theme puts its colours in the pickers, replacing any custom ones
+  function useTheme(form, key) {
+    const colors = state.admin.settings.options.themes[key].colors;
+    for (const scheme of ['light', 'dark']) {
+      for (const [k, v] of Object.entries(colors[scheme])) form.elements[scheme + ':' + k].value = v;
+    }
+  }
+
+  function themeChanged(look) {
+    const theme = state.admin.settings.options.themes[look.theme];
+    return !theme || ['light', 'dark'].some((s) => Object.keys(theme.colors[s]).some((k) => theme.colors[s][k] !== look.colors[s][k]));
+  }
+
+  function drawThemeStatus() {
+    const box = document.getElementById('look-theme');
+    if (!box) return;
+    const look = state.admin.look;
+    const theme = state.admin.settings.options.themes[look.theme];
+    box.innerHTML = theme && themeChanged(look) ? `
+      <div class="theme-status">
+        <p class="hint">${esc(theme.label)}, with your own colour changes.</p>
+        <button class="button secondary" type="button" data-action="admin-look-theme-reset">Reset to ${esc(theme.label)}</button>
+      </div>` : '';
+  }
+
+  // Same WCAG 2 formula as settings.js, which refuses to save below options.contrast.min
+  function luminance(hex) {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  function contrastRatio(a, b) {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  function drawContrast() {
+    const box = document.getElementById('look-contrast');
+    if (!box) return;
+    const c = state.admin.settings.options.contrast;
+    const issues = [];
+    for (const scheme of ['light', 'dark']) {
+      const colors = state.admin.look.colors[scheme];
+      for (const p of c.pairs) {
+        const ratio = contrastRatio(colors[p.fg], colors[p.bg]);
+        if (ratio < c.warn) issues.push({ text: `${p.label}, ${scheme} mode: ${ratio.toFixed(1)}:1.`, blocked: ratio < c.min });
+      }
+    }
+    if (!issues.length) {
+      box.innerHTML = '';
+      return;
+    }
+    const blocked = issues.some((i) => i.blocked);
+    box.innerHTML = `
+      <div class="notice${blocked ? ' error' : ''}">
+        <p>${blocked
+          ? `Some colours are too hard to read to save. Anything below ${c.min}:1 needs changing.`
+          : `Some colours may be hard to read. ${c.warn}:1 or more is easier on the eyes.`}</p>
+        <ul>${issues.map((i) => `<li>${esc(i.text)}${i.blocked ? ' <strong>Too low to save.</strong>' : ''}</li>`).join('')}</ul>
+      </div>`;
   }
 
   function clearPreview() {
@@ -1544,6 +1625,10 @@
         drawLook();
         setMsg('look', 'Defaults loaded. Save to apply them.', true);
         break;
+      case 'admin-look-theme-reset':
+        state.admin.look.colors = clone(state.admin.settings.options.themes[state.admin.look.theme].colors);
+        drawLook();
+        break;
       case 'admin-key-test': testKey(el); break;
       case 'admin-key-remove': removeKey(el); break;
       case 'user-reset-open':
@@ -1635,6 +1720,7 @@
       state.imp.draft.conflict = false;
       drawSaveStatus();
     } else if (e.target.form && e.target.form.dataset.action === 'admin-look' && state.admin) {
+      if (e.target.name === 'theme') useTheme(e.target.form, e.target.value);
       state.admin.look = readLook(e.target.form);
       previewLook();
     }

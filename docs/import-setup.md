@@ -3,7 +3,7 @@
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 
 - **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check and edit it, and save it straight into the recipes folder. It appears on the site immediately.
-- **Admin** (admins only), also at `#/admin`: change the site name, icon, colours (light and dark), fonts and corner rounding; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
+- **Admin** (admins only), also at `#/admin`: change the site name and icon, pick a colour theme (each has light and dark colours) and fine-tune its colours, and choose the fonts and corner rounding; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
 
 There are two roles. **Admins** can do everything. **Importers** can only import recipes. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
 
@@ -280,7 +280,7 @@ What the service does to protect itself:
 - Until someone with a temporary password has chosen their own, the server refuses every import and admin request from them. Changing a password needs the current one, counts wrong attempts towards the sign-in limit, and signs out the user's other sessions.
 - There's no self-service password reset, so there's nothing to abuse by guessing a user name. Only an admin, or someone with shell access to the VM, can reset a password.
 - An API key saved on the admin page is stored in `/var/lib/nomnoms/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
-- Only checked values reach the public `theme/` folder: colours must be hex codes, fonts come from a fixed list, corner rounding must be a whole number of pixels from 0 to 24, and icons must be PNG, ICO or WebP (SVG uploads are refused).
+- Only checked values reach the public `theme/` folder: colours must be hex codes, and the main text, link and button colours must contrast at least 3:1 with what's behind them (the admin page warns below 4.5:1); fonts come from a fixed list, corner rounding must be a whole number of pixels from 0 to 24, and icons must be PNG, ICO or WebP (SVG uploads are refused).
 - systemd limits the service to writing in the recipes folder, the theme folder and `/var/lib/nomnoms`.
 
 ## Day to day
