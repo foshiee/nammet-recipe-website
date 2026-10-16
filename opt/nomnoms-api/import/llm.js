@@ -7,6 +7,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.js';
+import { aiConfig, keyStatus } from '../settings.js';
 import { toAmount, normalizeFractions, canonicalUnit } from './ingredient.js';
 
 export class LlmError extends Error {
@@ -99,10 +100,35 @@ Field rules:
 - timer_seconds: when a step involves waiting a stated time (bake 25 minutes, simmer 1 hour, rest 10 minutes), that time in seconds; use the lower end of a range. Otherwise null.
 - notes: tips, storage or variation notes from the source, as separate strings. Keep quantities out of these too.`;
 
+// The key can change from the admin page, so the client is rebuilt when it does.
+// With no key at all the SDK falls back to ANTHROPIC_AUTH_TOKEN from the environment.
 let client = null;
+let clientKey;
 function getClient() {
-  if (!client) client = new Anthropic({ timeout: 80_000, maxRetries: 1 });
+  const { apiKey } = aiConfig();
+  if (!client || clientKey !== apiKey) {
+    client = new Anthropic({ ...(apiKey ? { apiKey } : {}), timeout: 80_000, maxRetries: 1 });
+    clientKey = apiKey;
+  }
   return client;
+}
+
+function requireKey() {
+  if (!keyStatus().set) {
+    throw new LlmError('This file needs Claude to read it, but no Anthropic API key is set. An admin can add one on the admin page. Recipe JSON files and pages with recipe markup still import without it.', 503);
+  }
+}
+
+// For the admin page's "Test key" button. Listing models costs nothing.
+export async function testKey() {
+  requireKey();
+  try {
+    await getClient().models.list({ limit: 1 });
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) throw new LlmError('Anthropic rejected the key.', 422);
+    if (e instanceof Anthropic.APIError) throw new LlmError(`Couldn't check the key (${e.status ?? 'network error'}). Try again shortly.`, 502);
+    throw e;
+  }
 }
 
 function contentFor(input) {
@@ -167,15 +193,14 @@ function toRecipe(out) {
 
 // input: { kind: 'pdf' | 'image' | 'text' | 'html', buffer?, mediaType?, text?, url? }
 export async function extractWithClaude(input) {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
-    throw new LlmError("This file needs Claude to read it, but no ANTHROPIC_API_KEY is set on the server. Recipe JSON files and pages with recipe markup still import without it.", 503);
-  }
+  requireKey();
+  const { model, effort } = aiConfig();
 
   const params = {
-    model: config.model,
+    model,
     max_tokens: 16000,
     system: SYSTEM,
-    output_config: { effort: config.effort, format: { type: 'json_schema', schema: SCHEMA } },
+    output_config: { effort, format: { type: 'json_schema', schema: SCHEMA } },
     messages: [{ role: 'user', content: contentFor(input) }]
   };
 

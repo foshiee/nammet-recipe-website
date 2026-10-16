@@ -1,4 +1,5 @@
-/* Recipes: enamel-blue control strip on a cool sea-glass page. */
+/* Recipes: enamel-blue control strip on a cool sea-glass page.
+   The admin page can override the variables in :root through theme/theme.css. */
 
 :root {
   --bg: #f1f4f2;
@@ -10,8 +11,9 @@
   --tint: #dde5f6;
   --field: #ffffff;
   --danger: #b3261e;
-  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", "Book Antiqua", Georgia, serif;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", "Book Antiqua", Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 8px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,7 +38,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 1rem/1.55 var(--sans);
+  font: 1rem/1.55 var(--font-body);
 }
 
 .page {
@@ -75,7 +77,7 @@ button { font: inherit; }
   display: inline-block;
   padding: .55rem 1.1rem;
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: var(--on-accent);
   font-weight: 600;
@@ -93,7 +95,7 @@ button { font: inherit; }
 
 h1 {
   margin: 0;
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.01em;
@@ -137,7 +139,7 @@ h1 {
 .tag {
   padding: .3rem .8rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: calc(var(--radius) * .75);
   background: transparent;
   color: var(--ink);
   font-size: .875rem;
@@ -164,7 +166,7 @@ h1 {
 }
 
 .row-title {
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.2;
@@ -223,7 +225,7 @@ h1 {
   max-width: 40rem;
   margin: .75rem 0 0;
   color: var(--muted);
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.2rem;
   line-height: 1.5;
 }
@@ -249,7 +251,7 @@ h1 {
   gap: .6rem 1rem;
   margin: 1.5rem 0 .9rem;
   padding: .55rem .75rem;
-  border-radius: 12px;
+  border-radius: calc(var(--radius) * 1.5);
   background: var(--accent);
   color: var(--on-accent);
 }
@@ -275,7 +277,7 @@ h1 {
 .stepper output {
   min-width: 2ch;
   text-align: center;
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.9rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -316,7 +318,7 @@ h1 {
   height: 1.25rem;
   margin: 0;
   border: 2px solid var(--muted);
-  border-radius: 4px;
+  border-radius: calc(var(--radius) * .5);
   background: transparent;
   -webkit-appearance: none;
   appearance: none;
@@ -349,14 +351,14 @@ h2 {
   margin: 0 0 .75rem;
   padding-bottom: .5rem;
   border-bottom: 1px solid var(--line);
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.5rem;
   line-height: 1.2;
 }
 
 .group h3 {
   margin: 1.25rem 0 .25rem;
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.1rem;
 }
 
@@ -401,7 +403,7 @@ h2 {
   border-radius: 50%;
   background: transparent;
   color: var(--accent);
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
@@ -409,7 +411,7 @@ h2 {
 
 .num[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 
-.step h3 { margin: 0 0 .25rem; font-family: var(--serif); font-size: 1.2rem; line-height: 1.3; }
+.step h3 { margin: 0 0 .25rem; font-family: var(--font-heading); font-size: 1.2rem; line-height: 1.3; }
 .step p { margin: 0; max-width: 38rem; }
 .step.done .step-body > h3,
 .step.done .step-body > p { color: var(--muted); text-decoration: line-through; }
@@ -435,7 +437,7 @@ h2 {
 .timer.done { background: var(--accent); color: var(--on-accent); }
 
 .clock {
-  font-family: var(--serif);
+  font-family: var(--font-heading);
   font-size: 1.2rem;
   font-variant-numeric: tabular-nums;
 }
@@ -473,7 +475,7 @@ h2 {
   width: 100%;
   padding: .6rem .7rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--field);
   color: var(--ink);
   font: inherit;
@@ -499,7 +501,7 @@ h2 {
   gap: .75rem;
   padding: 1rem;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: calc(var(--radius) * 1.5);
 }
 
 .source h2 { margin: 0; padding: 0; border: 0; font-size: 1.25rem; }
@@ -510,7 +512,7 @@ h2 {
   max-width: 40rem;
   margin: .5rem 0 1rem;
   padding: .6rem .8rem;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--tint);
 }
 
@@ -522,9 +524,9 @@ h2 {
   .review { grid-template-columns: 1fr 1fr; align-items: start; }
 }
 
-.preview .pv-title { margin: 0; font-family: var(--serif); font-size: 1.6rem; line-height: 1.2; }
+.preview .pv-title { margin: 0; font-family: var(--font-heading); font-size: 1.6rem; line-height: 1.2; }
 .preview .desc { font-size: 1.05rem; }
-.preview h4 { margin: 1rem 0 .25rem; font-family: var(--serif); font-size: 1.05rem; }
+.preview h4 { margin: 1rem 0 .25rem; font-family: var(--font-heading); font-size: 1.05rem; }
 .preview .group ul { margin: .5rem 0 0; padding: 0; list-style: none; }
 .preview .group li { padding: .15rem 0; }
 .preview .amt { display: inline-block; min-width: 5rem; }
@@ -550,12 +552,85 @@ h2 {
 .slug-field { display: flex; align-items: center; gap: .35rem; max-width: 32rem; margin-bottom: .35rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 
+/* ---------- Admin ---------- */
+
+#account-head { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.import select {
+  max-width: 100%;
+  padding: .55rem .6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+}
+
+.form-ok { color: var(--accent); font-weight: 600; }
+
+.admin-section { margin-top: 2.5rem; max-width: 44rem; }
+
+.admin-form { display: grid; gap: .35rem; }
+.admin-form + .admin-form { margin-top: 2rem; }
+.admin-form > label { margin-top: .75rem; font-weight: 600; }
+.admin-form > select { justify-self: start; }
+.admin-form h3 { margin: 0; font-family: var(--font-heading); font-size: 1.15rem; }
+
+.key-status { margin: .5rem 0 0; }
+
+.icon-row { display: flex; align-items: center; gap: .75rem; max-width: 22rem; }
+.icon-preview { flex: none; border-radius: calc(var(--radius) * .5); }
+
+.colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: .5rem 1rem;
+  margin: 1rem 0 0;
+  padding: .75rem 1rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.colors legend { padding: 0 .35rem; font-weight: 600; }
+
+.swatch { display: flex; align-items: center; gap: .6rem; font-size: .9rem; cursor: pointer; }
+
+.import .swatch input {
+  flex: none;
+  width: 2.5rem;
+  height: 2rem;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.users { margin: 1rem 0 0; padding: 0; list-style: none; }
+#admin-users .admin-form { margin-top: 2rem; }
+
+.user {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem 1rem;
+  padding: .75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.user:last-child { border-bottom: 1px solid var(--line); }
+.user-name { flex: 1 1 10rem; font-weight: 600; overflow-wrap: anywhere; }
+.user .note { font-weight: 400; }
+.link-button.danger { color: var(--danger); }
+
+.user-reset { display: grid; flex-basis: 100%; gap: .35rem; max-width: 22rem; }
+.user-reset label { font-weight: 600; }
+.user-reset .actions { margin-top: .5rem; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
 }
 
 @media print {
-  :root { --bg: #fff; --ink: #000; --muted: #333; --line: #bbb; --accent: #000; }
+  /* html:root outranks the colours in theme/theme.css */
+  html:root { --bg: #fff; --ink: #000; --muted: #333; --line: #bbb; --accent: #000; }
   .back, .controls, .wake, .timer-slot, .tags, .button, .site-foot { display: none !important; }
   .page { padding: 0; }
   .cols { grid-template-columns: 1fr 1.6fr; gap: 2rem; }

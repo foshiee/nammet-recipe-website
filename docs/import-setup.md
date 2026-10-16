@@ -1,16 +1,22 @@
 # Server setup and recipe import
 
-Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, an **Import recipe** button appears at the top right of the home page and stays for the session (7 days by default). From there you can import a recipe from a file, a web address or pasted text, check and edit it, and save it straight into the recipes folder. It appears on the site immediately.
+Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 
-The static site still works without any of this. If the import service is down, browsing and cooking are unaffected; only the import page shows an error.
+- **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check and edit it, and save it straight into the recipes folder. It appears on the site immediately.
+- **Admin** (admins only), also at `#/admin`: change the site name, icon, colours (light and dark), fonts and corner style; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
+
+There are two roles. **Admins** can do everything. **Importers** can only import recipes. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
+
+The static site still works without any of this. If the service is down, browsing and cooking are unaffected, and the site keeps its saved look; only the import and admin pages show an error.
 
 ## How it works
 
 ```
 browser ──HTTPS──> Traefik ──HTTP──> nginx :80 ──> /var/www/nomnoms        (static site)
                                           └─ /api/ ──> nomnoms-api :3000   (Node, 127.0.0.1 only)
-                                                          ├─ reads  /var/lib/nomnoms/users.json
+                                                          ├─ reads/writes /var/lib/nomnoms/users.json, settings.json
                                                           ├─ writes /var/www/nomnoms/recipes/<name>.json
+                                                          ├─ writes /var/www/nomnoms/theme/ (theme.css, site.json, favicon)
                                                           └─ calls  api.anthropic.com (only when needed)
 ```
 
@@ -126,12 +132,16 @@ sudo restorecon -Rv /var/www/nomnoms   # SELinux labels
 
 Recipe files go in `/var/www/nomnoms/recipes/`; see [recipe-format.md](recipe-format.md).
 
-### 7. Create the service account and its data folder
+### 7. Create the service account and its folders
 
 ```sh
 sudo useradd --system --home-dir /var/lib/nomnoms --shell /sbin/nologin nomnoms
 sudo install -d -m 0700 -o nomnoms -g nomnoms /var/lib/nomnoms
+sudo install -d -m 0755 -o nomnoms -g nomnoms /var/www/nomnoms/theme
+sudo restorecon -Rv /var/www/nomnoms/theme
 ```
+
+`/var/lib/nomnoms` holds the users file and the admin page's settings, including the API key if you save one there. `/var/www/nomnoms/theme` is public: the service writes the site's look into it (`theme.css`, `site.json` and the icon) each time an admin saves, and once when it starts.
 
 ### 8. Install the service code
 
@@ -175,15 +185,15 @@ sudo install -m 0640 -o root -g nomnoms etc/nomnoms/api.env.example /etc/nomnoms
 sudo nano /etc/nomnoms/api.env     # paste your key after ANTHROPIC_API_KEY=
 ```
 
-No quotes or spaces around the key. If you leave it empty for now, everything except PDF, photo and text imports still works. Add it later and restart the service.
+No quotes or spaces around the key. You can also leave it empty and add the key on the admin page once the site is running, which needs no restart. A key saved on the admin page takes priority over this file. Without any key, everything except PDF, photo and text imports still works.
 
 ### 11. Create your login
 
-Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory.
+This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory.
 
 ```sh
 cd /opt/nomnoms-api
-sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js yourname
+sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js yourname --role admin
 cd -
 ```
 
@@ -264,22 +274,24 @@ What the service does to protect itself:
 - Web-address imports refuse private, loopback and cloud-metadata addresses, including through redirects.
 - Uploads are limited to 20 MB, and file types are identified from their contents, not their names.
 - Recipe files are written atomically and never overwrite an existing recipe unless you confirm.
-- systemd limits the service to writing in the recipes folder.
+- Admin routes need the admin role, and import routes need the importer or admin role. Role changes and removals apply to open sessions straight away, and a password reset signs that user out everywhere.
+- An API key saved on the admin page is stored in `/var/lib/nomnoms/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
+- Only checked values reach the public `theme/` folder: colours must be hex codes, fonts and corner styles come from fixed lists, and icons must be PNG, ICO or WebP (SVG uploads are refused).
+- systemd limits the service to writing in the recipes folder, the theme folder and `/var/lib/nomnoms`.
 
 ## Day to day
 
-- **Add or reset a user:** `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name>`
-- **Remove a user:** the same command with `--remove`. Their open session lasts until it expires or the service restarts (`sudo systemctl restart nomnoms-api`).
-- **List users:** `--list` instead of a name.
+- **Users, the site's look and the API key:** use the admin page.
+- **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users file, `api.env` and the recipes all live outside the clone, so updates don't touch them.
+- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat the `install` line in setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users, settings, theme, `api.env` and the recipes all live outside the clone, so updates don't touch them.
 
 ## Cost of Claude imports
 
 Imports use `claude-sonnet-5-5` at medium effort by default. That model costs $2 per million input tokens and $10 per million output tokens. Most of the cost is the output, meaning the recipe itself plus the model's reasoning. Expect roughly 2 to 5 US cents per recipe, and more for a long multi-page PDF. These are estimates, so check real figures in the Anthropic console after your first few imports.
 
-To change the model, set `MODEL` in `/etc/nomnoms/api.env` and restart the service (`sudo systemctl restart nomnoms-api`). If blurry photos or messy scanned PDFs come out wrong, `claude-opus-5-5` is more accurate at about twice the price.
+To change the model or effort, use the admin page (takes effect on the next import), or set `MODEL` / `EFFORT` in `/etc/nomnoms/api.env` and restart the service (`sudo systemctl restart nomnoms-api`). The admin page wins when both are set. If blurry photos or messy scanned PDFs come out wrong, `claude-opus-5-5` is more accurate at about twice the price.
 
 ## Trying it locally
 
@@ -288,11 +300,12 @@ On your own machine, no nginx is needed. The service can serve the site too, and
 ```sh
 cd opt/nomnoms-api
 npm install
-USERS_FILE=./dev-users.json node tools/add-user.js tester
-USERS_FILE=./dev-users.json RECIPES_DIR=../../var/www/nomnoms/recipes \
-  DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
+USERS_FILE=./dev-users.json node tools/add-user.js tester --role admin
+mkdir -p ../../var/www/nomnoms/theme
+USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nomnoms/theme \
+  RECIPES_DIR=../../var/www/nomnoms/recipes DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
 ```
 
-Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nomnoms/recipes/` folder, so delete any test recipes before committing. `dev-users.json` is gitignored.
+Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nomnoms/recipes/` folder, so delete any test recipes before committing. `dev-users.json`, `dev-settings.json` and the generated `var/www/nomnoms/theme/` folder are gitignored.
 
 Tests for the parts that don't need Claude: `npm test`.

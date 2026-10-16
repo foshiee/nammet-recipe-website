@@ -1,11 +1,25 @@
-// nomnoms API: login and recipe import for the static recipe site.
+// nomnoms API: login, recipe import and the admin page for the static recipe site.
 // nginx proxies /api/ here; everything else is still served by nginx directly.
 //
 //   GET  /api/me        -> { user } (null when signed out)
 //   POST /api/login     { username, password }
 //   POST /api/logout
+//
+// Importers and admins:
 //   POST /api/import    multipart "file", or JSON { url } or { text }  -> draft recipe (nothing saved)
 //   POST /api/recipes   { slug, recipe, overwrite? }                   -> writes recipes/<slug>.json
+//
+// Admins only:
+//   GET  /api/admin/settings       -> appearance, Claude settings (never the key itself), options
+//   POST /api/admin/appearance     { siteName, favicon, colors, fonts, radius }
+//   POST /api/admin/favicon        multipart "file" (PNG, ICO or WebP)
+//   POST /api/admin/ai             { model, effort } (null = server default)
+//   POST /api/admin/api-key        { key } (empty removes it)
+//   POST /api/admin/api-key/test
+//   GET  /api/admin/users          -> { users: [{ username, role }] }
+//   POST /api/admin/users          { username, password, role }
+//   POST /api/admin/users/update   { username, role?, password? }
+//   POST /api/admin/users/delete   { username }
 //
 // Every POST must carry the header "X-Requested-With: nomnoms". Browsers won't
 // send a custom header cross-site without a CORS preflight, which this server
@@ -17,7 +31,9 @@ import path from 'node:path';
 import busboy from 'busboy';
 import { config } from './config.js';
 import * as auth from './auth.js';
+import * as settings from './settings.js';
 import { importFile, importText, importUrl, ImportError } from './import/index.js';
+import { testKey, LlmError } from './import/llm.js';
 import { validateRecipe } from './import/validate.js';
 import { saveRecipe, SaveError } from './save.js';
 
@@ -83,11 +99,11 @@ async function readJson(req, limit = 1024 * 1024) {
   }
 }
 
-function readUpload(req) {
+function readUpload(req, maxBytes = config.maxUploadBytes) {
   return new Promise((resolve, reject) => {
     let bb;
     try {
-      bb = busboy({ headers: req.headers, limits: { files: 1, fileSize: config.maxUploadBytes, fields: 5, fieldSize: 64 * 1024 } });
+      bb = busboy({ headers: req.headers, limits: { files: 1, fileSize: maxBytes, fields: 5, fieldSize: 64 * 1024 } });
     } catch {
       return reject(new HttpError(400, 'The upload could not be read.'));
     }
@@ -101,7 +117,10 @@ function readUpload(req) {
     });
     bb.on('error', () => reject(new HttpError(400, 'The upload could not be read.')));
     bb.on('close', () => {
-      if (tooBig) return reject(new HttpError(413, `Files must be under ${Math.round(config.maxUploadBytes / 1048576)} MB.`));
+      if (tooBig) {
+        const size = maxBytes < 1048576 ? `${Math.round(maxBytes / 1024)} KB` : `${Math.round(maxBytes / 1048576)} MB`;
+        return reject(new HttpError(413, `Files must be under ${size}.`));
+      }
       if (!file) return reject(new HttpError(400, 'No file was uploaded.'));
       resolve(file);
     });
@@ -113,10 +132,30 @@ function currentUser(req) {
   return auth.getSession(cookies(req)[auth.COOKIE]);
 }
 
-function requireUser(req) {
+function requireRole(req, ...roles) {
   const s = currentUser(req);
   if (!s) throw new HttpError(401, 'Please sign in.');
+  if (!roles.includes(s.role)) throw new HttpError(403, roles.length === 1 ? 'Admins only.' : "Your account can't do that.");
   return s;
+}
+
+const requireImporter = (req) => requireRole(req, 'admin', 'importer');
+const requireAdmin = (req) => requireRole(req, 'admin');
+
+function adminSettings() {
+  return {
+    appearance: settings.appearance(),
+    defaults: settings.DEFAULT_APPEARANCE,
+    ai: { ...settings.aiSettings(), key: settings.keyStatus() },
+    options: {
+      colors: settings.COLORS,
+      fonts: settings.FONTS,
+      radii: settings.RADII,
+      models: settings.MODELS,
+      efforts: settings.EFFORTS,
+      roles: auth.ROLES
+    }
+  };
 }
 
 /* ---------- routes ---------- */
@@ -145,7 +184,7 @@ const routes = {
   },
 
   'POST /api/import': async (req, res) => {
-    const user = requireUser(req);
+    const user = requireImporter(req);
     if (importsRunning >= MAX_IMPORTS) throw new HttpError(503, 'Several imports are already running. Try again in a moment.');
     importsRunning++;
     try {
@@ -173,13 +212,94 @@ const routes = {
   },
 
   'POST /api/recipes': async (req, res) => {
-    const user = requireUser(req);
+    const user = requireImporter(req);
     const { slug, recipe, overwrite } = await readJson(req, 512 * 1024);
     const v = validateRecipe(recipe);
     if (v.errors.length) return send(res, 422, { error: 'The recipe has problems that need fixing first.', errors: v.errors, warnings: v.warnings });
     const saved = await saveRecipe(slug, v.recipe, { overwrite: overwrite === true });
     console.log(`saved by ${user.username}: ${saved.file}${overwrite ? ' (replaced)' : ''}`);
     send(res, 201, { ...saved, warnings: v.warnings });
+  },
+
+  /* ---------- admin ---------- */
+
+  'GET /api/admin/settings': async (req, res) => {
+    requireAdmin(req);
+    send(res, 200, adminSettings());
+  },
+
+  'POST /api/admin/appearance': async (req, res) => {
+    const user = requireAdmin(req);
+    await settings.saveAppearance(await readJson(req, 64 * 1024));
+    console.log(`admin ${user.username}: changed the appearance`);
+    send(res, 200, adminSettings());
+  },
+
+  'POST /api/admin/favicon': async (req, res) => {
+    const user = requireAdmin(req);
+    if (!/^multipart\/form-data\b/i.test(req.headers['content-type'] || '')) throw new HttpError(415, 'Expected a file upload.');
+    const file = await readUpload(req, settings.MAX_FAVICON_BYTES);
+    await settings.saveFaviconImage(file.buffer);
+    console.log(`admin ${user.username}: uploaded a site icon (${file.buffer.length} bytes)`);
+    send(res, 200, adminSettings());
+  },
+
+  'POST /api/admin/ai': async (req, res) => {
+    const user = requireAdmin(req);
+    await settings.saveAi(await readJson(req, 16 * 1024));
+    const { model, effort } = settings.aiConfig();
+    console.log(`admin ${user.username}: Claude imports now use ${model} at ${effort} effort`);
+    send(res, 200, adminSettings());
+  },
+
+  // Write-only: the key is never sent back, and never logged.
+  'POST /api/admin/api-key': async (req, res) => {
+    const user = requireAdmin(req);
+    const { key } = await readJson(req, 16 * 1024);
+    await settings.saveApiKey(key);
+    console.log(`admin ${user.username}: ${key ? 'set' : 'removed'} the Anthropic API key`);
+    send(res, 200, adminSettings());
+  },
+
+  'POST /api/admin/api-key/test': async (req, res) => {
+    requireAdmin(req);
+    await testKey();
+    send(res, 200, { ok: true });
+  },
+
+  'GET /api/admin/users': async (req, res) => {
+    requireAdmin(req);
+    send(res, 200, { users: await auth.listUsers() });
+  },
+
+  'POST /api/admin/users': async (req, res) => {
+    const user = requireAdmin(req);
+    const { username, password, role } = await readJson(req, 16 * 1024);
+    const created = await auth.createUser({ username, password, role });
+    console.log(`admin ${user.username}: added ${created.username} (${created.role})`);
+    send(res, 201, { users: await auth.listUsers() });
+  },
+
+  'POST /api/admin/users/update': async (req, res) => {
+    const user = requireAdmin(req);
+    const { username, role, password } = await readJson(req, 16 * 1024);
+    const changes = {};
+    if (role !== undefined) changes.role = role;
+    if (password !== undefined) changes.password = password;
+    if (!Object.keys(changes).length) throw new HttpError(400, 'Nothing to change.');
+    // Resetting your own password keeps you signed in here but signs out your other sessions
+    await auth.updateUser(String(username || ''), changes, { keepToken: cookies(req)[auth.COOKIE] });
+    console.log(`admin ${user.username}: changed ${Object.keys(changes).join(' and ')} for ${username}`);
+    send(res, 200, { users: await auth.listUsers() });
+  },
+
+  'POST /api/admin/users/delete': async (req, res) => {
+    const user = requireAdmin(req);
+    const { username } = await readJson(req, 16 * 1024);
+    if (username === user.username) throw new HttpError(409, "You can't remove your own account.");
+    await auth.deleteUser(String(username || ''));
+    console.log(`admin ${user.username}: removed ${username}`);
+    send(res, 200, { users: await auth.listUsers() });
   }
 };
 
@@ -223,16 +343,20 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.headers['x-requested-with'] !== 'nomnoms') throw new HttpError(403, 'Missing request header.');
     await handler(req, res);
   } catch (e) {
-    const status = e instanceof HttpError || e instanceof ImportError || e instanceof SaveError ? e.status : 500;
+    const known = [HttpError, ImportError, SaveError, LlmError, settings.SettingsError, auth.UserError];
+    const status = known.some((k) => e instanceof k) ? e.status : 500;
     if (status === 500) console.error(`${req.method} ${pathname}:`, e);
     if (!res.headersSent) send(res, status, { error: status === 500 ? 'Something went wrong on the server.' : e.message });
   }
 });
 
+await settings.loadSettings();
+
 server.requestTimeout = 120_000;
 server.listen(config.port, config.host, () => {
   console.log(`nomnoms-api listening on http://${config.host}:${config.port}`);
   console.log(`recipes: ${path.resolve(config.recipesDir)}  users: ${path.resolve(config.usersFile)}`);
+  console.log(`settings: ${path.resolve(config.settingsFile)}  theme: ${path.resolve(config.themeDir)}`);
   if (config.devStaticRoot) console.log(`dev mode: also serving ${path.resolve(config.devStaticRoot)}`);
-  if (!process.env.ANTHROPIC_API_KEY) console.log('ANTHROPIC_API_KEY is not set: PDF, photo and plain-text imports are disabled.');
+  if (!settings.keyStatus().set) console.log('No Anthropic API key is set: PDF, photo and plain-text imports are disabled until one is added.');
 });

@@ -177,7 +177,9 @@
     wakeWanted: false,
     user: null,
     userKnown: false,
-    imp: { busy: false, error: '', draft: null }
+    imp: { busy: false, error: '', draft: null },
+    site: { name: 'Recipes' },
+    admin: null
   };
 
   function normalizeGroups(raw) {
@@ -276,14 +278,30 @@
     state.recipes = loaded.filter(Boolean).sort((a, b) => a.title.localeCompare(b.title));
   }
 
+  // Site name and icon chosen on the admin page. The service writes theme/site.json;
+  // without it (no service, or nothing saved yet) the defaults stay.
+  async function loadSite() {
+    try {
+      const res = await fetch('theme/site.json', { cache: 'no-cache' });
+      if (!res.ok) return;
+      const site = await res.json();
+      if (typeof site.name === 'string' && site.name.trim()) state.site.name = site.name.trim();
+      if (typeof site.favicon === 'string' && /^theme\/favicon\.(svg|png|ico|webp)(\?v=[0-9a-f]+)?$/.test(site.favicon)) {
+        document.getElementById('favicon').href = site.favicon;
+      }
+    } catch (e) { /* keep the defaults */ }
+  }
+
+  const pageTitle = (sub) => { document.title = sub ? `${sub} | ${state.site.name}` : state.site.name; };
+
   /* ---------- home view ---------- */
 
   function showHome() {
-    document.title = 'Tasty Nomnoms';
+    pageTitle();
 
     if (state.loadFailed) {
       app.innerHTML = `
-        <h1>Tasty Nomnoms</h1>
+        <h1>${esc(state.site.name)}</h1>
         <div class="notice">
           <p><strong>Couldn't load the recipe list.</strong></p>
           <p>The site looks for a <code>recipes/</code> folder next to this page. Check that it exists and that nginx has <code>autoindex on; autoindex_format json;</code> set for <code>/recipes/</code>.</p>
@@ -299,7 +317,7 @@
     app.innerHTML = `
       <section class="home">
         <div class="home-head">
-          <h1>Tasty Nomnoms</h1>
+          <h1>${esc(state.site.name)}</h1>
           <div id="account-head"></div>
         </div>
         ${n ?`<p class="count">${n} ${n === 1 ? 'recipe' : 'recipes'}</p>
@@ -316,11 +334,18 @@
     drawAccount();
   }
 
-  // Import is offered only to signed-in users. Visitors just see a small sign-in link in the footer.
+  const canImport = () => !!state.user && (state.user.role === 'admin' || state.user.role === 'importer');
+  const isAdmin = () => !!state.user && state.user.role === 'admin';
+
+  // Import is offered to importers and admins, and the admin page to admins only.
+  // Visitors just see a small sign-in link in the footer. The server checks roles too.
   function drawAccount() {
     const head = document.getElementById('account-head');
     const foot = document.getElementById('account-foot');
-    if (head) head.innerHTML = state.user ? '<a class="button" href="#/import">Import recipe</a>' : '';
+    if (head) {
+      head.innerHTML = (canImport() ? '<a class="button" href="#/import">Import recipe</a>' : '') +
+        (isAdmin() ? '<a class="button secondary" href="#/admin">Admin</a>' : '');
+    }
     if (foot) {
       foot.innerHTML = !state.userKnown ? ''
         : state.user ? `Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button>`
@@ -373,7 +398,7 @@
   function showRecipe(slug) {
     const r = state.recipes.find((x) => x.slug === slug);
     if (!r) {
-      document.title = 'Recipe not found | Tasty Nomnoms';
+      pageTitle('Recipe not found');
       app.innerHTML = `
         <a class="back" href="#/">All recipes</a>
         <div class="notice"><p><strong>That recipe doesn't exist.</strong></p><p>It may have been renamed or removed.</p></div>`;
@@ -384,7 +409,7 @@
     state.servings = r.servings;
     state.checked = new Set();
     state.timers = {};
-    document.title = r.title + ' | Tasty Nomnoms';
+    pageTitle(r.title);
 
     const wakeSupported = 'wakeLock' in navigator;
     const source = r.source
@@ -670,39 +695,49 @@
     claude: 'Extracted by Claude. Check the amounts, units and steps against the original before saving.'
   };
 
-  function showImport() {
-    document.title = 'Import a recipe | Tasty Nomnoms';
+  // Shared by #/import and #/admin. After signing in, route() shows the page that was asked for.
+  function showSignIn(lede) {
+    pageTitle('Sign in');
+    app.innerHTML = `
+      <section class="import">
+        <a class="back" href="#/">All recipes</a>
+        <h1>Sign in</h1>
+        <p class="lede">${esc(lede)}</p>
+        <form class="login" data-action="login">
+          <label for="login-user">User name</label>
+          <input id="login-user" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          <label for="login-pass">Password</label>
+          <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+          <button class="button" type="submit">Sign in</button>
+          <p id="login-status" class="form-error" role="alert">${esc(state.imp.error)}</p>
+        </form>
+      </section>`;
+    document.getElementById('login-user').focus();
+  }
 
+  function topBarHtml() {
+    return `
+      <div class="import-top">
+        <a class="back" href="#/">All recipes</a>
+        <p class="who">Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button></p>
+      </div>`;
+  }
+
+  function showImport() {
     if (!state.userKnown) {
       app.innerHTML = '<p class="status">Checking sign-in…</p>';
       return;
     }
 
     if (!state.user) {
-      app.innerHTML = `
-        <section class="import">
-          <a class="back" href="#/">All recipes</a>
-          <h1>Sign in</h1>
-          <p class="lede">Sign in to import recipes.</p>
-          <form class="login" data-action="login">
-            <label for="login-user">User name</label>
-            <input id="login-user" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-            <label for="login-pass">Password</label>
-            <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
-            <button class="button" type="submit">Sign in</button>
-            <p id="login-status" class="form-error" role="alert">${esc(state.imp.error)}</p>
-          </form>
-        </section>`;
-      document.getElementById('login-user').focus();
+      showSignIn('Sign in to import recipes.');
       return;
     }
 
+    pageTitle('Import a recipe');
     app.innerHTML = `
       <section class="import">
-        <div class="import-top">
-          <a class="back" href="#/">All recipes</a>
-          <p class="who">Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button></p>
-        </div>
+        ${topBarHtml()}
         <h1>Import a recipe</h1>
         <div id="import-body"></div>
       </section>`;
@@ -934,7 +969,7 @@
       const data = await api('login', { method: 'POST', json: { username: form.elements.username.value, password: form.elements.password.value } });
       state.user = data.user;
       state.imp.error = '';
-      showImport();
+      route();
     } catch (e) {
       status.textContent = e.message;
       btn.disabled = false;
@@ -947,8 +982,415 @@
     try { await api('logout', { method: 'POST' }); } catch (e) { /* signed out locally anyway */ }
     state.user = null;
     state.imp = { busy: false, error: '', draft: null };
-    if (location.hash === '#/import') location.hash = '#/';
+    state.admin = null;
+    if (location.hash === '#/import' || location.hash === '#/admin') location.hash = '#/';
     else route(); // signed out from the home page footer: no hash change, so redraw directly
+  }
+
+  /* ---------- admin ---------- */
+
+  // Admins only (the server checks too). state.admin holds what the server sent plus
+  // `look`, the appearance as edited on the page, which is previewed live until saved.
+
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const ROLE_TEXT = { admin: 'Admin', importer: 'Importer' };
+
+  function showAdmin() {
+    if (!state.userKnown) {
+      app.innerHTML = '<p class="status">Checking sign-in…</p>';
+      return;
+    }
+    if (!state.user) {
+      showSignIn('Sign in to manage the site.');
+      return;
+    }
+    pageTitle('Admin');
+    if (!isAdmin()) {
+      app.innerHTML = `
+        <section class="import admin">
+          ${topBarHtml()}
+          <h1>Admin</h1>
+          <div class="notice"><p>This page is for admins. Ask an admin if something needs changing.</p></div>
+        </section>`;
+      return;
+    }
+    app.innerHTML = `
+      <section class="import admin">
+        ${topBarHtml()}
+        <h1>Admin</h1>
+        <div id="admin-body"><p class="status">Loading settings…</p></div>
+      </section>`;
+    loadAdmin();
+  }
+
+  async function loadAdmin() {
+    try {
+      const [settings, users] = await Promise.all([api('admin/settings'), api('admin/users')]);
+      state.admin = { settings, users: users.users, look: clone(settings.appearance), resetFor: null };
+      drawAdmin();
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) return adminError(e);
+      const body = document.getElementById('admin-body');
+      if (body) body.innerHTML = `<div class="notice error"><p>${esc(e.message)}</p></div>`;
+    }
+  }
+
+  // Signed out, or no longer an admin: find out who we are now and redraw.
+  function adminError(e, section) {
+    if (e.status === 401 || e.status === 403) {
+      if (e.status === 401) state.imp.error = 'Your session ended. Sign in again.';
+      state.admin = null;
+      loadUser().then(() => { if (location.hash === '#/admin') route(); });
+      return;
+    }
+    setMsg(section, e.message);
+  }
+
+  function setMsg(section, text, ok) {
+    const box = document.getElementById('msg-' + section);
+    if (box) box.innerHTML = text ? `<p class="${ok ? 'form-ok' : 'form-error'}">${esc(text)}</p>` : '';
+  }
+
+  // Runs a request with the form's buttons disabled; errors land in the section's message line.
+  async function adminRequest(form, section, fn) {
+    const buttons = form ? [...form.querySelectorAll('button')] : [];
+    buttons.forEach((b) => { b.disabled = true; });
+    setMsg(section, '');
+    try {
+      await fn();
+    } catch (e) {
+      adminError(e, section);
+    } finally {
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  function drawAdmin() {
+    const body = document.getElementById('admin-body');
+    if (!body || !state.admin) return;
+    body.innerHTML = `
+      <section class="admin-section" aria-labelledby="ad-look-h"><h2 id="ad-look-h">Appearance</h2><div id="admin-look"></div></section>
+      <section class="admin-section" aria-labelledby="ad-ai-h"><h2 id="ad-ai-h">Claude</h2><div id="admin-ai"></div></section>
+      <section class="admin-section" aria-labelledby="ad-users-h"><h2 id="ad-users-h">Users</h2><div id="admin-users"></div></section>`;
+    drawLook();
+    drawAi();
+    drawUsers();
+  }
+
+  /* appearance */
+
+  function drawLook() {
+    const box = document.getElementById('admin-look');
+    const a = state.admin;
+    if (!box || !a) return;
+    const o = a.settings.options;
+    const look = a.look;
+    const image = look.favicon.type === 'image';
+    const options = (map, selected) => Object.keys(map)
+      .map((k) => `<option value="${esc(k)}"${k === selected ? ' selected' : ''}>${esc(map[k].label)}</option>`).join('');
+    const swatches = (scheme) => Object.keys(o.colors).map((k) => `
+      <label class="swatch"><input type="color" name="${scheme}:${esc(k)}" value="${esc(look.colors[scheme][k])}"><span>${esc(o.colors[k])}</span></label>`).join('');
+
+    box.innerHTML = `
+      <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. Visitors see them once you save.</p>
+      <form class="admin-form" data-action="admin-look">
+        <label for="ad-name">Site name</label>
+        <input id="ad-name" name="siteName" maxlength="60" required value="${esc(look.siteName)}">
+        <p class="hint">Shown as the home page heading and in the browser tab.</p>
+        <label for="ad-emoji">Site icon</label>
+        <div class="icon-row">
+          ${image ? `<img class="icon-preview" src="${esc(document.getElementById('favicon').getAttribute('href'))}" alt="Current icon" width="32" height="32">` : ''}
+          <input id="ad-emoji" name="emoji" value="${image ? '' : esc(look.favicon.value)}" placeholder="${image ? 'Using the uploaded image' : ''}">
+        </div>
+        <p class="hint">An emoji, or a letter or two.${image ? ' Leave it empty to keep the uploaded image.' : ''} To use a picture instead, upload one below.</p>
+        <fieldset class="colors"><legend>Colours in light mode</legend>${swatches('light')}</fieldset>
+        <fieldset class="colors"><legend>Colours in dark mode</legend>${swatches('dark')}</fieldset>
+        <label for="ad-heading">Heading font</label>
+        <select id="ad-heading" name="heading">${options(o.fonts, look.fonts.heading)}</select>
+        <label for="ad-body">Body font</label>
+        <select id="ad-body" name="body">${options(o.fonts, look.fonts.body)}</select>
+        <p class="hint">Fonts already on your visitors' devices, so nothing extra is downloaded. Each device shows its closest match.</p>
+        <label for="ad-radius">Corners</label>
+        <select id="ad-radius" name="radius">${options(o.radii, look.radius)}</select>
+        <div class="actions">
+          <button class="button" type="submit">Save appearance</button>
+          <button class="button secondary" type="button" data-action="admin-look-undo">Undo changes</button>
+          <button class="button secondary" type="button" data-action="admin-look-defaults">Use the defaults</button>
+        </div>
+        <div id="msg-look" aria-live="polite"></div>
+      </form>
+      <form class="admin-form" data-action="admin-favicon">
+        <label for="ad-icon-file">Upload an icon</label>
+        <input id="ad-icon-file" type="file" name="file" accept=".png,.ico,.webp,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp">
+        <p class="hint">PNG, ICO or WebP, under 256 KB. Square images work best. It replaces the emoji as soon as it's uploaded.</p>
+        <div class="actions"><button class="button secondary" type="submit">Upload icon</button></div>
+        <div id="msg-icon" aria-live="polite"></div>
+      </form>`;
+    previewLook();
+  }
+
+  function readLook(form) {
+    const f = form.elements;
+    const look = clone(state.admin.look);
+    look.siteName = f.siteName.value;
+    const emoji = f.emoji.value.trim();
+    const saved = state.admin.settings.appearance.favicon;
+    look.favicon = emoji ? { type: 'emoji', value: emoji } : saved.type === 'image' ? saved : { type: 'emoji', value: '' };
+    for (const scheme of ['light', 'dark']) {
+      for (const k of Object.keys(look.colors[scheme])) look.colors[scheme][k] = f[scheme + ':' + k].value;
+    }
+    look.fonts = { heading: f.heading.value, body: f.body.value };
+    look.radius = f.radius.value;
+    return look;
+  }
+
+  // Inline variables on <html> beat theme.css, so the page shows the edits before they're saved
+  function previewLook() {
+    const a = state.admin;
+    if (!a) return;
+    const o = a.settings.options;
+    const root = document.documentElement.style;
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    for (const [k, v] of Object.entries(a.look.colors[scheme])) root.setProperty('--' + k, v);
+    root.setProperty('--font-heading', o.fonts[a.look.fonts.heading].stack);
+    root.setProperty('--font-body', o.fonts[a.look.fonts.body].stack);
+    root.setProperty('--radius', o.radii[a.look.radius].value);
+  }
+
+  function clearPreview() {
+    const root = document.documentElement.style;
+    for (const p of [...root]) if (p.startsWith('--')) root.removeProperty(p);
+  }
+
+  // Picks up the files the service just rewrote, for the rest of the site
+  function reloadTheme() {
+    document.getElementById('theme-css').href = 'theme/theme.css?v=' + Date.now();
+    loadSite();
+  }
+
+  async function saveLook(form) {
+    const look = readLook(form);
+    if (look.favicon.type === 'emoji' && !look.favicon.value) {
+      setMsg('look', 'Choose an emoji for the site icon, or upload an image.');
+      return;
+    }
+    await adminRequest(form, 'look', async () => {
+      const data = await api('admin/appearance', { method: 'POST', json: look });
+      state.admin.settings = data;
+      state.admin.look = clone(data.appearance);
+      state.site.name = data.appearance.siteName;
+      reloadTheme();
+      drawLook();
+      setMsg('look', 'Saved. Visitors see the new look the next time they load the site.', true);
+    });
+  }
+
+  async function uploadFavicon(form) {
+    const file = form.elements.file.files[0];
+    if (!file) return setMsg('icon', 'Choose an image first.');
+    if (file.size > 256 * 1024) return setMsg('icon', 'Icons must be under 256 KB.');
+    const body = new FormData();
+    body.append('file', file, file.name);
+    await adminRequest(form, 'icon', async () => {
+      const data = await api('admin/favicon', { method: 'POST', form: body });
+      state.admin.settings = data;
+      // Keep any unsaved edits; only the icon changes
+      state.admin.look.favicon = clone(data.appearance.favicon);
+      await loadSite();
+      drawLook();
+      setMsg('icon', 'Icon uploaded.', true);
+    });
+  }
+
+  /* Claude */
+
+  function drawAi() {
+    const box = document.getElementById('admin-ai');
+    const a = state.admin;
+    if (!box || !a) return;
+    const ai = a.settings.ai;
+    const k = ai.key;
+    const o = a.settings.options;
+    const status = !k.set ? 'not set, so PDF, photo and pasted-text imports are switched off.'
+      : `set${k.last4 ? `, ending in …${k.last4}` : ''} (${k.source === 'admin' ? 'saved on this page' : "from the server's api.env file"}).`;
+    const select = (name, list, value, fallback) => `
+      <select id="ad-${name}" name="${name}">
+        <option value="">Server default (${esc(fallback)})</option>
+        ${list.map((v) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(v)}</option>`).join('')}
+      </select>`;
+
+    // The key field is write-only: it starts empty, is never filled from the server,
+    // and can't be copied out (see the copy/cut/dragstart listeners below).
+    box.innerHTML = `
+      <p class="hint">Claude reads PDFs, photos, pasted text and web pages without recipe data. Recipe files and most recipe sites import without it.</p>
+      <form class="admin-form" data-action="admin-key" autocomplete="off">
+        <p class="key-status"><strong>API key:</strong> ${esc(status)}</p>
+        <label for="ad-key">${k.set ? 'Replace the key' : 'Add a key'}</label>
+        <input id="ad-key" name="key" type="password" required data-secret autocomplete="off" autocapitalize="none" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="sk-ant-…">
+        <p class="hint">Stored on the server and never shown again. A key saved here takes priority over api.env.</p>
+        <div class="actions">
+          <button class="button" type="submit">Save key</button>
+          ${k.set ? '<button class="button secondary" type="button" data-action="admin-key-test">Test key</button>' : ''}
+          ${k.source === 'admin' ? '<button class="button secondary" type="button" data-action="admin-key-remove">Remove key</button>' : ''}
+        </div>
+        <div id="msg-key" aria-live="polite"></div>
+      </form>
+      <form class="admin-form" data-action="admin-ai">
+        <label for="ad-model">Model</label>
+        ${select('model', o.models, ai.model, ai.defaults.model)}
+        <label for="ad-effort">Effort</label>
+        ${select('effort', o.efforts, ai.effort, ai.defaults.effort)}
+        <p class="hint">Opus is more accurate on blurry photos and messy PDFs, at about twice the price. Higher effort is slower and costs more.</p>
+        <div class="actions"><button class="button" type="submit">Save</button></div>
+        <div id="msg-ai" aria-live="polite"></div>
+      </form>`;
+  }
+
+  async function saveKey(form) {
+    const input = form.elements.key;
+    const key = input.value.trim();
+    input.value = ''; // never left on the page
+    if (!key) return;
+    await adminRequest(form, 'key', async () => {
+      state.admin.settings = await api('admin/api-key', { method: 'POST', json: { key } });
+      drawAi();
+      setMsg('key', 'Key saved. Use "Test key" to check it works.', true);
+    });
+  }
+
+  async function removeKey(btn) {
+    if (!confirm('Remove the API key saved on this page?')) return;
+    await adminRequest(btn.closest('form'), 'key', async () => {
+      state.admin.settings = await api('admin/api-key', { method: 'POST', json: { key: '' } });
+      drawAi();
+      setMsg('key', state.admin.settings.ai.key.set ? "Removed. The key from the server's api.env file is used instead." : 'Removed.', true);
+    });
+  }
+
+  async function testKey(btn) {
+    await adminRequest(btn.closest('form'), 'key', async () => {
+      await api('admin/api-key/test', { method: 'POST' });
+      setMsg('key', 'The key works.', true);
+    });
+  }
+
+  async function saveAi(form) {
+    const f = form.elements;
+    await adminRequest(form, 'ai', async () => {
+      state.admin.settings = await api('admin/ai', { method: 'POST', json: { model: f.model.value || null, effort: f.effort.value || null } });
+      drawAi();
+      setMsg('ai', 'Saved. The next Claude import uses these settings.', true);
+    });
+  }
+
+  /* users */
+
+  function drawUsers() {
+    const box = document.getElementById('admin-users');
+    const a = state.admin;
+    if (!box || !a) return;
+    const roles = a.settings.options.roles;
+    const roleOptions = (selected) => roles
+      .map((r) => `<option value="${esc(r)}"${r === selected ? ' selected' : ''}>${esc(ROLE_TEXT[r] || r)}</option>`).join('');
+
+    box.innerHTML = `
+      <p class="hint">Admins can use this page and import recipes. Importers can only import recipes. Visitors don't need an account.</p>
+      <ul class="users">
+        ${a.users.map((u) => {
+          const me = u.username === state.user.username;
+          const name = esc(u.username);
+          return `
+          <li class="user">
+            <span class="user-name">${name}${me ? ' <span class="note">(you)</span>' : ''}</span>
+            <select data-action="user-role" data-user="${name}" aria-label="Role for ${name}">${roleOptions(u.role)}</select>
+            <button class="link-button" data-action="user-reset-open" data-user="${name}">Reset password</button>
+            ${me ? '' : `<button class="link-button danger" data-action="user-delete" data-user="${name}">Remove</button>`}
+            ${a.resetFor === u.username ? `
+              <form class="user-reset" data-action="user-reset" data-user="${name}">
+                <label for="ad-reset">New password for ${name}</label>
+                <input id="ad-reset" name="password" type="password" minlength="12" required autocomplete="new-password" data-secret>
+                <div class="actions">
+                  <button class="button" type="submit">Set password</button>
+                  <button class="button secondary" type="button" data-action="user-reset-cancel">Cancel</button>
+                </div>
+              </form>` : ''}
+          </li>`;
+        }).join('')}
+      </ul>
+      <div id="msg-users" aria-live="polite"></div>
+      <form class="admin-form" data-action="user-add">
+        <h3>Add a user</h3>
+        <label for="ad-new-user">User name</label>
+        <input id="ad-new-user" name="username" maxlength="32" required autocomplete="off" autocapitalize="none" spellcheck="false">
+        <p class="hint">Lowercase letters, numbers, ".", "_" or "-".</p>
+        <label for="ad-new-pass">Password</label>
+        <input id="ad-new-pass" name="password" type="password" minlength="12" required autocomplete="new-password" data-secret>
+        <p class="hint">At least 12 characters. Share it with them privately.</p>
+        <label for="ad-new-role">Role</label>
+        <select id="ad-new-role" name="role">${roleOptions('importer')}</select>
+        <div class="actions"><button class="button" type="submit">Add user</button></div>
+        <div id="msg-useradd" aria-live="polite"></div>
+      </form>`;
+  }
+
+  async function changeRole(select) {
+    const username = select.dataset.user;
+    const role = select.value;
+    const me = username === state.user.username;
+    if (me && role !== 'admin' && !confirm("You'll lose access to this page. Continue?")) {
+      drawUsers();
+      return;
+    }
+    select.disabled = true;
+    try {
+      const data = await api('admin/users/update', { method: 'POST', json: { username, role } });
+      state.admin.users = data.users;
+      if (me) {
+        state.user.role = role;
+        if (role !== 'admin') { route(); return; }
+      }
+      drawUsers();
+      setMsg('users', `${username} is now ${role === 'admin' ? 'an admin' : 'an importer'}.`, true);
+    } catch (e) {
+      drawUsers(); // put the old role back
+      adminError(e, 'users');
+    }
+  }
+
+  async function resetPassword(form) {
+    const username = form.dataset.user;
+    const password = form.elements.password.value;
+    await adminRequest(form, 'users', async () => {
+      const data = await api('admin/users/update', { method: 'POST', json: { username, password } });
+      state.admin.users = data.users;
+      state.admin.resetFor = null;
+      drawUsers();
+      setMsg('users', username === state.user.username
+        ? 'Your password is changed. Your other sessions were signed out.'
+        : `Password changed. ${username} has been signed out everywhere.`, true);
+    });
+  }
+
+  async function deleteUser(btn) {
+    const username = btn.dataset.user;
+    if (!confirm(`Remove ${username}? They'll be signed out straight away.`)) return;
+    await adminRequest(null, 'users', async () => {
+      const data = await api('admin/users/delete', { method: 'POST', json: { username } });
+      state.admin.users = data.users;
+      drawUsers();
+      setMsg('users', `Removed ${username}.`, true);
+    });
+  }
+
+  async function addUser(form) {
+    const f = form.elements;
+    const username = f.username.value.trim().toLowerCase();
+    await adminRequest(form, 'useradd', async () => {
+      const data = await api('admin/users', { method: 'POST', json: { username, password: f.password.value, role: f.role.value } });
+      state.admin.users = data.users;
+      drawUsers();
+      setMsg('users', `Added ${username}.`, true);
+    });
   }
 
   /* ---------- routing ---------- */
@@ -964,6 +1406,7 @@
 
   function route() {
     leaveRecipe();
+    clearPreview();
     const m = location.hash.match(/^#\/r\/(.+)$/);
     if (m) {
       let slug = m[1];
@@ -971,6 +1414,8 @@
       showRecipe(slug);
     } else if (location.hash === '#/import') {
       showImport();
+    } else if (location.hash === '#/admin') {
+      showAdmin();
     } else {
       showHome();
     }
@@ -1010,6 +1455,27 @@
         state.imp = { busy: false, error: '', draft: null };
         drawImport();
         break;
+      case 'admin-look-undo':
+        state.admin.look = clone(state.admin.settings.appearance);
+        drawLook();
+        break;
+      case 'admin-look-defaults':
+        state.admin.look = clone(state.admin.settings.defaults);
+        drawLook();
+        setMsg('look', 'Defaults loaded. Save to apply them.', true);
+        break;
+      case 'admin-key-test': testKey(el); break;
+      case 'admin-key-remove': removeKey(el); break;
+      case 'user-reset-open':
+        state.admin.resetFor = el.dataset.user;
+        drawUsers();
+        document.getElementById('ad-reset').focus();
+        break;
+      case 'user-reset-cancel':
+        state.admin.resetFor = null;
+        drawUsers();
+        break;
+      case 'user-delete': deleteUser(el); break;
       default: break;
     }
   });
@@ -1023,6 +1489,12 @@
       case 'import-file': importFile(form.elements.file.files[0]); break;
       case 'import-url': runImport({ url: form.elements.url.value.trim() }); break;
       case 'import-text': runImport({ text: form.elements.text.value }); break;
+      case 'admin-look': saveLook(form); break;
+      case 'admin-favicon': uploadFavicon(form); break;
+      case 'admin-key': saveKey(form); break;
+      case 'admin-ai': saveAi(form); break;
+      case 'user-reset': resetPassword(form); break;
+      case 'user-add': addUser(form); break;
       default: break;
     }
   });
@@ -1059,8 +1531,17 @@
       else state.checked.delete(el.dataset.key);
     } else if (el.dataset.action === 'wake') {
       setWake(el.checked);
+    } else if (el.dataset.action === 'user-role') {
+      changeRole(el);
     }
   });
+
+  // API keys and passwords typed on the admin page can't be copied or dragged back out
+  for (const type of ['copy', 'cut', 'dragstart']) {
+    app.addEventListener(type, (e) => {
+      if (e.target instanceof Element && e.target.closest('[data-secret]')) e.preventDefault();
+    });
+  }
 
   app.addEventListener('input', (e) => {
     if (e.target.id === 'search') {
@@ -1072,15 +1553,18 @@
       state.imp.draft.slug = e.target.value;
       state.imp.draft.conflict = false;
       drawSaveStatus();
+    } else if (e.target.form && e.target.form.dataset.action === 'admin-look' && state.admin) {
+      state.admin.look = readLook(e.target.form);
+      previewLook();
     }
   });
 
   window.addEventListener('hashchange', route);
 
-  loadRecipes().then(route);
+  Promise.all([loadRecipes(), loadSite()]).then(route);
   // Sign-in state is loaded separately so it never holds up the recipe list
   loadUser().then(() => {
-    if (location.hash === '#/import') route();
+    if (location.hash === '#/import' || location.hash === '#/admin') route();
     else drawAccount();
   });
 })();
