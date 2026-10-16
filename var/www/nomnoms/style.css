@@ -190,10 +190,17 @@ h1 {
 
 .empty { margin: 1.5rem 0; color: var(--muted); }
 
+/* Outside .page, so it carries its own width and gutters */
 .site-foot {
-  margin-top: 3rem;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
   color: var(--muted);
   font-size: .85rem;
+}
+
+@media (min-width: 40rem) {
+  .site-foot { padding: 0 1.5rem 2.5rem; }
 }
 
 .site-foot a { color: inherit; }
@@ -450,16 +457,6 @@ h2 {
 /* ---------- Sign-in & import ---------- */
 
 .import h1 { font-size: clamp(2rem, 6vw, 3rem); }
-
-.import-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0 1rem;
-}
-
-.who { margin: 0 0 1.25rem; color: var(--muted); font-size: .9rem; }
 
 .lede { max-width: 40rem; margin: .75rem 0 1.5rem; color: var(--muted); }
 

@@ -2,6 +2,7 @@
   'use strict';
 
   const app = document.getElementById('app');
+  const foot = document.getElementById('account-foot');
 
   /* ---------- helpers ---------- */
 
@@ -326,7 +327,6 @@
         <ul id="list" class="list"></ul>
         <p id="empty" class="empty" hidden></p>
         ${problems}
-        <footer id="account-foot" class="site-foot"></footer>
       </section>`;
 
     drawTags();
@@ -339,22 +339,17 @@
   const canImport = () => !!state.user && !mustChangePassword() && (state.user.role === 'admin' || state.user.role === 'importer');
   const isAdmin = () => !!state.user && !mustChangePassword() && state.user.role === 'admin';
   const accountLinksHtml = () =>
-    `Signed in as ${esc(state.user.username)} · <a href="#/password">Change password</a> · <button class="link-button" data-action="logout">Sign out</button>`;
+    `Signed in as ${esc(state.user.username)} · ${isAdmin() ? '<a href="#/admin">Admin</a> · ' : ''}<a href="#/password">Change password</a> · <button class="link-button" data-action="logout">Sign out</button>`;
 
-  // Import is offered to importers and admins, and the admin page to admins only.
-  // Visitors just see a small sign-in link in the footer. The server checks roles too.
+  // Import is offered on the home page to importers and admins. The footer (outside #app,
+  // so it's on every page) links to the admin page for admins, and visitors just see a
+  // small sign-in link there. The server checks roles too.
   function drawAccount() {
     const head = document.getElementById('account-head');
-    const foot = document.getElementById('account-foot');
-    if (head) {
-      head.innerHTML = (canImport() ? '<a class="button" href="#/import">Import recipe</a>' : '') +
-        (isAdmin() ? '<a class="button secondary" href="#/admin">Admin</a>' : '');
-    }
-    if (foot) {
-      foot.innerHTML = !state.userKnown ? ''
-        : state.user ? accountLinksHtml()
-        : '<a href="#/import">Sign in</a>';
-    }
+    if (head) head.innerHTML = canImport() ? '<a class="button" href="#/import">Import recipe</a>' : '';
+    foot.innerHTML = !state.userKnown ? ''
+      : state.user ? accountLinksHtml()
+      : '<a href="#/import">Sign in</a>';
   }
 
   function drawTags() {
@@ -720,14 +715,6 @@
     document.getElementById('login-user').focus();
   }
 
-  function topBarHtml() {
-    return `
-      <div class="import-top">
-        <a class="back" href="#/">All recipes</a>
-        <p class="who">${accountLinksHtml()}</p>
-      </div>`;
-  }
-
   // #/password, and in place of #/import or #/admin while the password is temporary
   function showPassword() {
     if (!state.userKnown) {
@@ -742,7 +729,7 @@
     pageTitle(forced ? 'Choose a password' : 'Change password');
     app.innerHTML = `
       <section class="import">
-        ${topBarHtml()}
+        <a class="back" href="#/">All recipes</a>
         <h1>${forced ? 'Choose your own password' : 'Change password'}</h1>
         ${forced ? '<p class="lede">Your password was set by an admin. Choose your own to carry on.</p>' : ''}
         <form class="login" data-action="password">
@@ -806,6 +793,7 @@
       return;
     }
 
+    drawAccount(); // also called after the session ends mid-import, outside route()
     if (!state.user) {
       showSignIn('Sign in to import recipes.');
       return;
@@ -814,7 +802,7 @@
     pageTitle('Import a recipe');
     app.innerHTML = `
       <section class="import">
-        ${topBarHtml()}
+        <a class="back" href="#/">All recipes</a>
         <h1>Import a recipe</h1>
         <div id="import-body"></div>
       </section>`;
@@ -1061,7 +1049,7 @@
     state.imp = { busy: false, error: '', draft: null };
     state.admin = null;
     if (ACCOUNT_PAGES.includes(location.hash)) location.hash = '#/';
-    else route(); // signed out from the home page footer: no hash change, so redraw directly
+    else route(); // signed out from a page anyone can see: no hash change, so redraw directly
   }
 
   /* ---------- admin ---------- */
@@ -1085,7 +1073,7 @@
     if (!isAdmin()) {
       app.innerHTML = `
         <section class="import admin">
-          ${topBarHtml()}
+          <a class="back" href="#/">All recipes</a>
           <h1>Admin</h1>
           <div class="notice"><p>This page is for admins. Ask an admin if something needs changing.</p></div>
         </section>`;
@@ -1093,7 +1081,7 @@
     }
     app.innerHTML = `
       <section class="import admin">
-        ${topBarHtml()}
+        <a class="back" href="#/">All recipes</a>
         <h1>Admin</h1>
         <div id="admin-body"><p class="status">Loading settings…</p></div>
       </section>`;
@@ -1506,10 +1494,16 @@
     } else {
       showHome();
     }
+    drawAccount();
     window.scrollTo(0, 0);
   }
 
   /* ---------- events ---------- */
+
+  // The account footer sits outside #app so it's on every page; its only action is signing out
+  foot.addEventListener('click', (e) => {
+    if (e.target.closest('[data-action="logout"]')) logout();
+  });
 
   app.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');
@@ -1534,7 +1528,6 @@
       case 'step': toggleStep(el); break;
       case 'timer-start': startTimer(el.dataset.i); break;
       case 'timer-stop': stopTimer(el.dataset.i); break;
-      case 'logout': logout(); break;
       case 'imp-preview': drawPreview(); break;
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
