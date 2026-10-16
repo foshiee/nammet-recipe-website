@@ -116,7 +116,10 @@ test('claude settings: admin page overrides the environment', async () => {
 test('user management and roles', async () => {
   await auth.createUser({ username: 'Boss', password: 'correct horse battery', role: 'admin' });
   await auth.createUser({ username: 'cook', password: 'correct horse battery', role: 'importer' });
-  assert.deepEqual(await auth.listUsers(), [{ username: 'boss', role: 'admin' }, { username: 'cook', role: 'importer' }]);
+  assert.deepEqual(await auth.listUsers(), [
+    { username: 'boss', role: 'admin', mustChangePassword: false },
+    { username: 'cook', role: 'importer', mustChangePassword: false }
+  ]);
 
   await assert.rejects(auth.createUser({ username: 'cook', password: 'correct horse battery', role: 'importer' }), /already/);
   await assert.rejects(auth.createUser({ username: 'new', password: 'short', role: 'importer' }), /at least/);
@@ -136,7 +139,7 @@ test('user management and roles', async () => {
   assert.equal(auth.getSession(session.token), null, 'a password reset signs the user out');
 
   await auth.deleteUser('boss');
-  assert.deepEqual(await auth.listUsers(), [{ username: 'cook', role: 'admin' }]);
+  assert.deepEqual(await auth.listUsers(), [{ username: 'cook', role: 'admin', mustChangePassword: false }]);
 
   // A user without a role is an importer; an unknown role can't sign in
   const raw = await auth.readUsers();
@@ -144,4 +147,40 @@ test('user management and roles', async () => {
   await auth.writeUsers(raw);
   assert.equal((await auth.login('norole', 'another long password', '127.0.0.2')).user.role, 'importer');
   assert.equal((await auth.login('odd', 'another long password', '127.0.0.3')).error, 'invalid');
+});
+
+test('temporary passwords', async () => {
+  const flagged = async (name) => (await auth.listUsers()).find((u) => u.username === name).mustChangePassword;
+
+  await auth.createUser({ username: 'temp', password: 'set by the admin', role: 'importer', temporary: true });
+  assert.equal(await flagged('temp'), true);
+  const first = await auth.login('temp', 'set by the admin', '10.0.0.1');
+  const other = await auth.login('temp', 'set by the admin', '10.0.0.1');
+  assert.equal(first.user.mustChangePassword, true);
+  assert.equal(auth.getSession(first.token).mustChangePassword, true);
+
+  await assert.rejects(auth.changePassword('temp', 'not the password', 'my very own password', '10.0.0.1', first.token), /current password/);
+  await assert.rejects(auth.changePassword('temp', 'set by the admin', 'set by the admin', '10.0.0.1', first.token), /different/);
+  await assert.rejects(auth.changePassword('temp', 'set by the admin', 'short', '10.0.0.1', first.token), /at least/);
+
+  const changed = await auth.changePassword('temp', 'set by the admin', 'my very own password', '10.0.0.1', first.token);
+  assert.equal(changed.user.mustChangePassword, false);
+  assert.equal(await flagged('temp'), false);
+  assert.equal(auth.getSession(first.token).mustChangePassword, false, 'the session that changed it carries on');
+  assert.equal(auth.getSession(other.token), null, 'other sessions are signed out');
+  assert.equal((await auth.login('temp', 'my very own password', '10.0.0.1')).user.mustChangePassword, false);
+
+  // An admin reset is temporary only when asked; a role change leaves the flag alone
+  await auth.updateUser('temp', { password: 'reset by the admin', temporary: true });
+  assert.equal(await flagged('temp'), true);
+  await auth.updateUser('temp', { role: 'admin' });
+  assert.equal(await flagged('temp'), true);
+  await auth.updateUser('temp', { password: 'reset by themselves' });
+  assert.equal(await flagged('temp'), false);
+
+  // Wrong current passwords count towards the sign-in limit
+  for (let i = 0; i < 5; i++) {
+    await assert.rejects(auth.changePassword('temp', 'wrong guess', 'my very own password', '10.0.0.2'), /current password/);
+  }
+  assert.equal((await auth.changePassword('temp', 'reset by themselves', 'my very own password', '10.0.0.2')).error, 'rate');
 });

@@ -7,6 +7,10 @@
 //
 // Roles: "admin" can do everything, including the admin page. "importer" can only
 // import and save recipes. A user without a role is an importer.
+//
+// A password someone else set (an admin, or tools/add-user.js without --permanent) is
+// temporary: the user has "mustChangePassword": true and can do nothing but choose their
+// own until they have. There's no self-service reset; a forgotten password is an admin's job.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -30,6 +34,9 @@ export class UserError extends Error {
 }
 
 const roleOf = (user) => user.role || 'importer';
+
+// What the browser is told about a user or session
+export const publicUser = (u) => ({ username: u.username, role: roleOf(u), mustChangePassword: !!u.mustChangePassword });
 
 /* ---------- passwords ---------- */
 
@@ -105,10 +112,11 @@ function findUser(users, username) {
 const adminCount = (users) => users.filter((u) => roleOf(u) === 'admin').length;
 
 export async function listUsers(file) {
-  return (await readUsers(file)).map((u) => ({ username: u.username, role: roleOf(u) }));
+  return (await readUsers(file)).map(publicUser);
 }
 
-export async function createUser({ username, password, role }, file) {
+// temporary: the user must choose their own password at their next sign-in.
+export async function createUser({ username, password, role, temporary }, file) {
   username = String(username || '').trim().toLowerCase();
   if (!USERNAME_RE.test(username)) throw new UserError('User names are 1-32 characters: lowercase letters, numbers, ".", "_" or "-".');
   checkRole(role);
@@ -116,13 +124,16 @@ export async function createUser({ username, password, role }, file) {
   const passwordHash = await hashPassword(password);
   return changeUsers((users) => {
     if (users.some((u) => u.username === username)) throw new UserError(`There's already a user called ${username}.`, 409);
-    users.push({ username, passwordHash, role });
-    return { username, role };
+    const user = { username, passwordHash, role };
+    if (temporary) user.mustChangePassword = true;
+    users.push(user);
+    return publicUser(user);
   }, file);
 }
 
-// changes: { role?, password? }. A new role applies to the user's open sessions straight
-// away; a new password signs them out everywhere except keepToken (the admin's own session).
+// changes: { role?, password?, temporary? }. A new role applies to the user's open sessions
+// straight away; a new password signs them out everywhere except keepToken (the admin's own
+// session), and is temporary only if changes.temporary says so.
 export async function updateUser(username, changes, { keepToken, file } = {}) {
   if (changes.role !== undefined) checkRole(changes.role);
   if (changes.password !== undefined) checkPassword(changes.password);
@@ -133,12 +144,46 @@ export async function updateUser(username, changes, { keepToken, file } = {}) {
       throw new UserError(`${username} is the only admin. Make someone else an admin first.`, 409);
     }
     if (changes.role !== undefined) user.role = changes.role;
-    if (passwordHash) user.passwordHash = passwordHash;
-    return { username: user.username, role: roleOf(user) };
+    if (passwordHash) {
+      user.passwordHash = passwordHash;
+      if (changes.temporary) user.mustChangePassword = true;
+      else delete user.mustChangePassword;
+    }
+    return publicUser(user);
   }, file);
   if (passwordHash) dropSessions(username, keepToken);
-  for (const s of sessions.values()) if (s.username === username) s.role = result.role;
+  for (const s of sessions.values()) {
+    if (s.username !== username) continue;
+    s.role = result.role;
+    s.mustChangePassword = result.mustChangePassword;
+  }
   return result;
+}
+
+// A signed-in user choosing their own password. Needs the current one, which counts
+// towards the sign-in rate limit when wrong. Signs out their other sessions.
+export async function changePassword(username, current, next, ip, keepToken, file) {
+  current = String(current || '');
+  if (isRateLimited(ip, username)) return { error: 'rate' };
+  checkPassword(next);
+  const user = (await readUsers(file)).find((u) => u.username === username);
+  if (!user) throw new UserError(`There's no user called ${username}.`, 404);
+  if (!(await verifyPassword(current, user.passwordHash))) {
+    recordFailure(ip, username);
+    throw new UserError('Your current password is wrong.');
+  }
+  if (next.normalize('NFKC') === current.normalize('NFKC')) throw new UserError('Choose a password different from the current one.');
+  const passwordHash = await hashPassword(next);
+  const result = await changeUsers((users) => {
+    const u = findUser(users, username);
+    u.passwordHash = passwordHash;
+    delete u.mustChangePassword;
+    return publicUser(u);
+  }, file);
+  dropSessions(username, keepToken);
+  const kept = sessions.get(keepToken);
+  if (kept) kept.mustChangePassword = false;
+  return { user: result };
 }
 
 export async function deleteUser(username, { file } = {}) {
@@ -196,9 +241,9 @@ export async function login(username, password, ip) {
 
   failures.delete('user:' + username);
   const token = crypto.randomBytes(32).toString('base64url');
-  const role = roleOf(user);
-  sessions.set(token, { username: user.username, role, expires: Date.now() + config.sessionHours * 3600e3 });
-  return { token, user: { username: user.username, role } };
+  const pub = publicUser(user);
+  sessions.set(token, { ...pub, expires: Date.now() + config.sessionHours * 3600e3 });
+  return { token, user: pub };
 }
 
 export function logout(token) {

@@ -334,8 +334,12 @@
     drawAccount();
   }
 
-  const canImport = () => !!state.user && (state.user.role === 'admin' || state.user.role === 'importer');
-  const isAdmin = () => !!state.user && state.user.role === 'admin';
+  // Someone with a temporary password can do nothing else until they've chosen their own
+  const mustChangePassword = () => !!state.user && !!state.user.mustChangePassword;
+  const canImport = () => !!state.user && !mustChangePassword() && (state.user.role === 'admin' || state.user.role === 'importer');
+  const isAdmin = () => !!state.user && !mustChangePassword() && state.user.role === 'admin';
+  const accountLinksHtml = () =>
+    `Signed in as ${esc(state.user.username)} · <a href="#/password">Change password</a> · <button class="link-button" data-action="logout">Sign out</button>`;
 
   // Import is offered to importers and admins, and the admin page to admins only.
   // Visitors just see a small sign-in link in the footer. The server checks roles too.
@@ -348,7 +352,7 @@
     }
     if (foot) {
       foot.innerHTML = !state.userKnown ? ''
-        : state.user ? `Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button>`
+        : state.user ? accountLinksHtml()
         : '<a href="#/import">Sign in</a>';
     }
   }
@@ -710,6 +714,7 @@
           <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
           <button class="button" type="submit">Sign in</button>
           <p id="login-status" class="form-error" role="alert">${esc(state.imp.error)}</p>
+          <p class="hint">Forgotten your password? Ask an admin to reset it.</p>
         </form>
       </section>`;
     document.getElementById('login-user').focus();
@@ -719,8 +724,80 @@
     return `
       <div class="import-top">
         <a class="back" href="#/">All recipes</a>
-        <p class="who">Signed in as ${esc(state.user.username)} · <button class="link-button" data-action="logout">Sign out</button></p>
+        <p class="who">${accountLinksHtml()}</p>
       </div>`;
+  }
+
+  // #/password, and in place of #/import or #/admin while the password is temporary
+  function showPassword() {
+    if (!state.userKnown) {
+      app.innerHTML = '<p class="status">Checking sign-in…</p>';
+      return;
+    }
+    if (!state.user) {
+      showSignIn('Sign in to change your password.');
+      return;
+    }
+    const forced = mustChangePassword();
+    pageTitle(forced ? 'Choose a password' : 'Change password');
+    app.innerHTML = `
+      <section class="import">
+        ${topBarHtml()}
+        <h1>${forced ? 'Choose your own password' : 'Change password'}</h1>
+        ${forced ? '<p class="lede">Your password was set by an admin. Choose your own to carry on.</p>' : ''}
+        <form class="login" data-action="password">
+          <label for="pw-current">${forced ? 'Password from your admin' : 'Current password'}</label>
+          <input id="pw-current" name="current" type="password" autocomplete="current-password" required data-secret>
+          <label for="pw-new">New password</label>
+          <input id="pw-new" name="password" type="password" minlength="12" autocomplete="new-password" required data-secret>
+          <label for="pw-repeat">Repeat new password</label>
+          <input id="pw-repeat" name="repeat" type="password" minlength="12" autocomplete="new-password" required data-secret>
+          <p class="hint">At least 12 characters. Your other sessions will be signed out.</p>
+          <button class="button" type="submit">${forced ? 'Set password' : 'Change password'}</button>
+          <p id="pw-status" class="form-error" role="alert"></p>
+        </form>
+      </section>`;
+    document.getElementById('pw-current').focus();
+  }
+
+  async function changePassword(form) {
+    const f = form.elements;
+    const status = document.getElementById('pw-status');
+    const btn = form.querySelector('button');
+    const forced = mustChangePassword();
+    status.className = 'form-error';
+    if (f.password.value !== f.repeat.value) {
+      status.textContent = "The new passwords don't match.";
+      f.repeat.value = '';
+      f.repeat.focus();
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = '';
+    try {
+      const data = await api('password', { method: 'POST', json: { current: f.current.value, password: f.password.value } });
+      state.user = data.user;
+      if (forced) {
+        // On to the page that was asked for
+        if (location.hash === '#/password') location.hash = '#/';
+        else route();
+        return;
+      }
+      form.reset();
+      status.className = 'form-ok';
+      status.textContent = 'Password changed. Your other sessions were signed out.';
+    } catch (e) {
+      if (e.status === 401) {
+        state.user = null;
+        state.imp.error = 'Your session ended. Sign in again.';
+        route();
+        return;
+      }
+      status.textContent = e.message;
+      form.reset();
+      f.current.focus();
+    }
+    btn.disabled = false;
   }
 
   function showImport() {
@@ -983,7 +1060,7 @@
     state.user = null;
     state.imp = { busy: false, error: '', draft: null };
     state.admin = null;
-    if (location.hash === '#/import' || location.hash === '#/admin') location.hash = '#/';
+    if (ACCOUNT_PAGES.includes(location.hash)) location.hash = '#/';
     else route(); // signed out from the home page footer: no hash change, so redraw directly
   }
 
@@ -1306,7 +1383,7 @@
           const name = esc(u.username);
           return `
           <li class="user">
-            <span class="user-name">${name}${me ? ' <span class="note">(you)</span>' : ''}</span>
+            <span class="user-name">${name}${me ? ' <span class="note">(you)</span>' : ''}${u.mustChangePassword ? ' <span class="note">(temporary password)</span>' : ''}</span>
             <select data-action="user-role" data-user="${name}" aria-label="Role for ${name}">${roleOptions(u.role)}</select>
             <button class="link-button" data-action="user-reset-open" data-user="${name}">Reset password</button>
             ${me ? '' : `<button class="link-button danger" data-action="user-delete" data-user="${name}">Remove</button>`}
@@ -1330,7 +1407,7 @@
         <p class="hint">Lowercase letters, numbers, ".", "_" or "-".</p>
         <label for="ad-new-pass">Password</label>
         <input id="ad-new-pass" name="password" type="password" minlength="12" required autocomplete="new-password" data-secret>
-        <p class="hint">At least 12 characters. Share it with them privately.</p>
+        <p class="hint">At least 12 characters. Share it with them privately. They'll choose their own when they first sign in.</p>
         <label for="ad-new-role">Role</label>
         <select id="ad-new-role" name="role">${roleOptions('importer')}</select>
         <div class="actions"><button class="button" type="submit">Add user</button></div>
@@ -1372,7 +1449,7 @@
       drawUsers();
       setMsg('users', username === state.user.username
         ? 'Your password is changed. Your other sessions were signed out.'
-        : `Password changed. ${username} has been signed out everywhere.`, true);
+        : `Password changed. ${username} has been signed out everywhere, and will choose their own password when they next sign in.`, true);
     });
   }
 
@@ -1409,6 +1486,9 @@
     state.current = null;
   }
 
+  // Pages that need the sign-in state, and are left when signing out
+  const ACCOUNT_PAGES = ['#/import', '#/admin', '#/password'];
+
   function route() {
     leaveRecipe();
     clearPreview();
@@ -1417,6 +1497,8 @@
       let slug = m[1];
       try { slug = decodeURIComponent(slug); } catch (e) { /* keep raw */ }
       showRecipe(slug);
+    } else if (location.hash === '#/password' || (ACCOUNT_PAGES.includes(location.hash) && mustChangePassword())) {
+      showPassword();
     } else if (location.hash === '#/import') {
       showImport();
     } else if (location.hash === '#/admin') {
@@ -1491,6 +1573,7 @@
     e.preventDefault();
     switch (form.dataset.action) {
       case 'login': login(form); break;
+      case 'password': changePassword(form); break;
       case 'import-file': importFile(form.elements.file.files[0]); break;
       case 'import-url': runImport({ url: form.elements.url.value.trim() }); break;
       case 'import-text': runImport({ text: form.elements.text.value }); break;
@@ -1569,7 +1652,7 @@
   Promise.all([loadRecipes(), loadSite()]).then(route);
   // Sign-in state is loaded separately so it never holds up the recipe list
   loadUser().then(() => {
-    if (location.hash === '#/import' || location.hash === '#/admin') route();
+    if (ACCOUNT_PAGES.includes(location.hash)) route();
     else drawAccount();
   });
 })();

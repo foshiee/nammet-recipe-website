@@ -7,6 +7,8 @@ Visitors see no sign of the import feature apart from a small **Sign in** link a
 
 There are two roles. **Admins** can do everything. **Importers** can only import recipes. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
 
+A password set for someone else, whether on the admin page or with the command-line tool, is temporary. At their first sign-in they're asked to choose their own, and they can't do anything else until they have. Anyone signed in can also change their password at any time with **Change password** next to **Sign out**. There's no "forgot password" link: that would need some other way to prove who you are, such as email, so a forgotten password is reset by an admin, who hands over a new temporary one.
+
 The static site still works without any of this. If the service is down, browsing and cooking are unaffected, and the site keeps its saved look; only the import and admin pages show an error.
 
 ## How it works
@@ -189,7 +191,7 @@ No quotes or spaces around the key. You can also leave it empty and add the key 
 
 ### 11. Create your login
 
-This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory.
+This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory. The password is temporary, so you'll choose your own the first time you sign in. Add `--permanent` to skip that.
 
 ```sh
 cd /opt/nomnoms-api
@@ -234,7 +236,7 @@ The address to use, and how to find it, is in the security checklist below.
 ### 15. Check it end to end
 
 1. Open the site in a browser over HTTPS. There should be a small **Sign in** link at the bottom of the home page. If it isn't there, force-refresh the page (Ctrl+F5) to drop the cached `app.js`.
-2. Click it and sign in. You should land on the import screen, and the home page should now show **Import recipe** at the top right.
+2. Click it and sign in. You'll be asked to choose your own password (unless you used `--permanent`), then you should land on the import screen, and the home page should now show **Import recipe** at the top right.
 3. Import a recipe web page, such as one from BBC Good Food or Allrecipes. The review screen should say *Read from the recipe data the web page publishes*.
 4. Save it. You should land on the new recipe, and it should be on the home page.
 5. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
@@ -275,6 +277,8 @@ What the service does to protect itself:
 - Uploads are limited to 20 MB, and file types are identified from their contents, not their names.
 - Recipe files are written atomically and never overwrite an existing recipe unless you confirm.
 - Admin routes need the admin role, and import routes need the importer or admin role. Role changes and removals apply to open sessions straight away, and a password reset signs that user out everywhere.
+- Until someone with a temporary password has chosen their own, the server refuses every import and admin request from them. Changing a password needs the current one, counts wrong attempts towards the sign-in limit, and signs out the user's other sessions.
+- There's no self-service password reset, so there's nothing to abuse by guessing a user name. Only an admin, or someone with shell access to the VM, can reset a password.
 - An API key saved on the admin page is stored in `/var/lib/nomnoms/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
 - Only checked values reach the public `theme/` folder: colours must be hex codes, fonts come from a fixed list, corner rounding must be a whole number of pixels from 0 to 24, and icons must be PNG, ICO or WebP (SVG uploads are refused).
 - systemd limits the service to writing in the recipes folder, the theme folder and `/var/lib/nomnoms`.
@@ -282,7 +286,7 @@ What the service does to protect itself:
 ## Day to day
 
 - **Users, the site's look and the API key:** use the admin page.
-- **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
+- **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer] [--permanent]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). The password is temporary unless you pass `--permanent`, for example when resetting your own. Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
 - **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat the `install` line in setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users, settings, theme, `api.env` and the recipes all live outside the clone, so updates don't touch them.
@@ -300,7 +304,7 @@ On your own machine, no nginx is needed. The service can serve the site too, and
 ```sh
 cd opt/nomnoms-api
 npm install
-USERS_FILE=./dev-users.json node tools/add-user.js tester --role admin
+USERS_FILE=./dev-users.json node tools/add-user.js tester --role admin --permanent
 mkdir -p ../../var/www/nomnoms/theme
 USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nomnoms/theme \
   RECIPES_DIR=../../var/www/nomnoms/recipes DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js

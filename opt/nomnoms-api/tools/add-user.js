@@ -2,12 +2,15 @@
 // Add a user, reset their password or role, or remove them. The admin page can do
 // all of this too; this tool is for creating the first admin and for emergencies.
 //
-//   node tools/add-user.js <username> [--role admin|importer]   add, or reset the password
-//   node tools/add-user.js <username> --remove                   remove
-//   node tools/add-user.js --list                                list users
+//   node tools/add-user.js <username> [--role admin|importer] [--permanent]   add, or reset the password
+//   node tools/add-user.js <username> --remove                                remove
+//   node tools/add-user.js --list                                             list users
 //
 // New users are admins if there's no admin yet, otherwise importers, unless --role says
 // otherwise. A password reset keeps the role unless --role is given.
+//
+// Passwords set here are temporary: the user chooses their own at their next sign-in.
+// --permanent skips that, for example when you're setting your own.
 //
 // The password is asked for twice without echoing. It can also be piped in on
 // stdin (one line) for scripted setups. Uses USERS_FILE, like the server.
@@ -42,7 +45,7 @@ function fail(message) {
 
 function usage(message) {
   if (message) console.error(message);
-  console.error('Usage: node tools/add-user.js <username> [--role admin|importer] [--remove] | --list');
+  console.error('Usage: node tools/add-user.js <username> [--role admin|importer] [--permanent] [--remove] | --list');
   console.error('User names: 1-32 characters, lowercase letters, numbers, ".", "_" or "-".');
   process.exit(1);
 }
@@ -53,7 +56,7 @@ async function main() {
   if (args.includes('--list')) {
     const users = await listUsers();
     if (!users.length) console.log(`No users in ${config.usersFile}`);
-    for (const u of users) console.log(`${u.username} (${u.role})`);
+    for (const u of users) console.log(`${u.username} (${u.role})${u.mustChangePassword ? ' - temporary password' : ''}`);
     return;
   }
 
@@ -74,19 +77,22 @@ async function main() {
     return;
   }
 
+  const temporary = !args.includes('--permanent');
   const password = await ask('Password: ', true);
   if (password.length < MIN_PASSWORD) fail(`Passwords must be at least ${MIN_PASSWORD} characters.`);
   if (process.stdin.isTTY && (await ask("Repeat password: ", true)) !== password) fail("The passwords don't match.");
 
   const users = await readUsers();
+  let done;
   if (users.some((u) => u.username === username)) {
-    const changed = await updateUser(username, role ? { password, role } : { password });
-    console.log(`Updated ${username} (${changed.role}) in ${config.usersFile}`);
+    const changed = await updateUser(username, role ? { password, role, temporary } : { password, temporary });
+    done = `Updated ${username} (${changed.role}) in ${config.usersFile}.`;
   } else {
     const hasAdmin = users.some((u) => u.role === 'admin');
-    const created = await createUser({ username, password, role: role || (hasAdmin ? 'importer' : 'admin') });
-    console.log(`Added ${username} (${created.role}) in ${config.usersFile}`);
+    const created = await createUser({ username, password, role: role || (hasAdmin ? 'importer' : 'admin'), temporary });
+    done = `Added ${username} (${created.role}) in ${config.usersFile}.`;
   }
+  console.log(`${done} ${temporary ? `${username} will choose their own password at their next sign-in.` : 'The password is permanent.'}`);
 }
 
 main().catch((e) => {

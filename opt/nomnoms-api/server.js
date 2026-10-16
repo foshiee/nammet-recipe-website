@@ -4,6 +4,10 @@
 //   GET  /api/me        -> { user } (null when signed out)
 //   POST /api/login     { username, password }
 //   POST /api/logout
+//   POST /api/password  { current, password }   any signed-in user choosing their own password
+//
+// A user whose password was set by someone else has mustChangePassword: true and gets 403
+// from every route below until they've used /api/password.
 //
 // Importers and admins:
 //   POST /api/import    multipart "file", or JSON { url } or { text }  -> draft recipe (nothing saved)
@@ -135,6 +139,7 @@ function currentUser(req) {
 function requireRole(req, ...roles) {
   const s = currentUser(req);
   if (!s) throw new HttpError(401, 'Please sign in.');
+  if (s.mustChangePassword) throw new HttpError(403, 'Choose a new password first.');
   if (!roles.includes(s.role)) throw new HttpError(403, roles.length === 1 ? 'Admins only.' : "Your account can't do that.");
   return s;
 }
@@ -166,7 +171,7 @@ const MAX_IMPORTS = 4;
 const routes = {
   'GET /api/me': async (req, res) => {
     const s = currentUser(req);
-    send(res, 200, { user: s ? { username: s.username, role: s.role } : null });
+    send(res, 200, { user: s ? auth.publicUser(s) : null });
   },
 
   'POST /api/login': async (req, res) => {
@@ -181,6 +186,16 @@ const routes = {
   'POST /api/logout': async (req, res) => {
     auth.logout(cookies(req)[auth.COOKIE]);
     send(res, 200, { ok: true }, { 'Set-Cookie': auth.clearCookie() });
+  },
+
+  'POST /api/password': async (req, res) => {
+    const s = currentUser(req);
+    if (!s) throw new HttpError(401, 'Please sign in.');
+    const { current, password } = await readJson(req, 16 * 1024);
+    const result = await auth.changePassword(s.username, current, password, clientIp(req), cookies(req)[auth.COOKIE]);
+    if (result.error === 'rate') throw new HttpError(429, 'Too many failed attempts. Wait 15 minutes and try again.');
+    console.log(`password changed: ${s.username} from ${clientIp(req)}`);
+    send(res, 200, { user: result.user });
   },
 
   'POST /api/import': async (req, res) => {
@@ -275,7 +290,7 @@ const routes = {
   'POST /api/admin/users': async (req, res) => {
     const user = requireAdmin(req);
     const { username, password, role } = await readJson(req, 16 * 1024);
-    const created = await auth.createUser({ username, password, role });
+    const created = await auth.createUser({ username, password, role, temporary: true });
     console.log(`admin ${user.username}: added ${created.username} (${created.role})`);
     send(res, 201, { users: await auth.listUsers() });
   },
@@ -286,10 +301,13 @@ const routes = {
     const changes = {};
     if (role !== undefined) changes.role = role;
     if (password !== undefined) changes.password = password;
-    if (!Object.keys(changes).length) throw new HttpError(400, 'Nothing to change.');
-    // Resetting your own password keeps you signed in here but signs out your other sessions
+    const what = Object.keys(changes).join(' and ');
+    if (!what) throw new HttpError(400, 'Nothing to change.');
+    // A password set for someone else is temporary: they choose their own at next sign-in.
+    // Resetting your own keeps you signed in here but signs out your other sessions.
+    if (password !== undefined) changes.temporary = username !== user.username;
     await auth.updateUser(String(username || ''), changes, { keepToken: cookies(req)[auth.COOKIE] });
-    console.log(`admin ${user.username}: changed ${Object.keys(changes).join(' and ')} for ${username}`);
+    console.log(`admin ${user.username}: changed ${what} for ${username}`);
     send(res, 200, { users: await auth.listUsers() });
   },
 
