@@ -265,7 +265,7 @@ Traefik ends HTTPS, so passwords and session cookies are encrypted between the b
 
 - **Traefik redirects HTTP to HTTPS** for this site's router.
 - **The Traefik to nginx hop stays on a trusted network**, such as the same host, a Docker network or your LAN.
-- **The real-IP lines in the nginx config are filled in.** Without them, the login rate limit counts all visitors as one, so failed logins from anyone lock everyone out for 15 minutes.
+- **The real-IP lines in the nginx config are filled in.** Without them, the login rate limit and the recipe-file rate limit count all visitors as one, so failed logins from anyone lock everyone out for 15 minutes, and a busy evening can get everyone a 429.
 - **`COOKIE_SECURE=true`** in `/etc/nomnoms/api.env`, which is the default.
 
 What the service does to protect itself:

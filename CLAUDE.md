@@ -13,6 +13,7 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `var/www/nomnoms/style.css` | same | All styling; light/dark via `prefers-color-scheme` and CSS variables in `:root` (the defaults; `theme/theme.css` overrides them). |
 | `var/www/nomnoms/theme/` | same | **Generated, gitignored.** `theme.css`, `site.json` and the favicon, written by the service from the admin page's settings. Absent on a site without the service, which then uses the defaults. |
 | `var/www/nomnoms/recipes/*.json` | same | Recipe data served to the browser. Only `example-recipe.json` is tracked. |
+| `var/www/nomnoms/robots.txt` | same | Turns away AI crawlers and keeps search engines out of `/recipes/` and `/api/`. Its AI list matches the user-agent block in the nginx config; keep them in sync. |
 | `opt/nomnoms-api/` | `/opt/nomnoms-api/` | Node service for login, import and admin, proxied at `/api/`. See below. |
 | `etc/nginx/conf.d/nginx-nomnoms.conf` | `/etc/nginx/conf.d/nomnoms.conf` | Server block (note the rename on deploy). |
 | `etc/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Stock RHEL-style main config; includes `conf.d/*.conf`. |
@@ -58,7 +59,7 @@ Node 20+, ES modules, two dependencies (`@anthropic-ai/sdk`, `busboy`). Settings
 
 ## nginx
 
-`nginx-nomnoms.conf` is a `default_server` on port 80 with root `/var/www/nomnoms`. `/` uses `try_files` with `Cache-Control: no-cache`. `/recipes/` enables `autoindex on; autoindex_format json;`, which is what lets new recipe files (including imported ones) appear on a page refresh without editing code or reloading nginx. Removing that block breaks recipe discovery (only the `index.json` fallback remains). `/api/` proxies to the service on `127.0.0.1:3000`. HTTPS ends at a Traefik reverse proxy in front of nginx; the commented `set_real_ip_from` lines must name Traefik's address so rate limiting sees real client IPs.
+`nginx-nomnoms.conf` is a `default_server` on port 80 with root `/var/www/nomnoms`. `/` uses `try_files` with `Cache-Control: no-cache`. `/recipes/` enables `autoindex on; autoindex_format json;`, which is what lets new recipe files (including imported ones) appear on a page refresh without editing code or reloading nginx. Removing that block breaks recipe discovery (only the `index.json` fallback remains). Requests whose user agent matches the `$blocked_bot` map (AI crawlers and scraping libraries) get a 403 everywhere, and `/recipes/` is rate-limited per IP (`limit_req`, 2 r/s with a burst of 200 so one page load can fetch every recipe; raise the burst if the collection nears that). `/api/` proxies to the service on `127.0.0.1:3000`. HTTPS ends at a Traefik reverse proxy in front of nginx; the commented `set_real_ip_from` lines must name Traefik's address so rate limiting sees real client IPs.
 
 ## Conventions
 
