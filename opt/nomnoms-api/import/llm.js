@@ -206,8 +206,9 @@ export async function extractWithClaude(input) {
 
   let res;
   try {
-    // Server-side fallbacks retry a safety-classifier refusal on a suitable model within the same call
-    res = config.aiFallbacks
+    // Server-side fallbacks retry a safety-classifier refusal on a suitable model within the same call.
+    // Haiku models have none, so the parameter is left off for them.
+    res = config.aiFallbacks && !model.startsWith('claude-haiku')
       ? await getClient().beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
       : await getClient().messages.create(params);
   } catch (e) {

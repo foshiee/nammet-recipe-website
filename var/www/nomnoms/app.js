@@ -1391,7 +1391,7 @@
         ${select('model', o.models, ai.model, ai.defaults.model)}
         <label for="ad-effort">Effort</label>
         ${select('effort', o.efforts, ai.effort, ai.defaults.effort)}
-        <p class="hint">Opus is more accurate on blurry photos and messy PDFs, at about twice the price. Higher effort is slower and costs more.</p>
+        <p class="hint">Haiku costs about a twentieth of Sonnet and suits clear pages and typed text. Opus is more accurate on blurry photos and messy PDFs, at about twice the price of Sonnet. Higher effort is slower and costs more.</p>
         <div class="actions"><button class="button" type="submit">Save</button></div>
         <div id="msg-ai" aria-live="polite"></div>
       </form>`;

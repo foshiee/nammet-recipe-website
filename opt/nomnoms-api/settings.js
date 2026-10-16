@@ -132,7 +132,7 @@ export const RADIUS = { min: 0, max: 24 };
 // Settings saved before the slider used these named corner styles
 const LEGACY_RADII = { square: 0, subtle: 4, default: 8, round: 14 };
 
-export const MODELS = ['claude-sonnet-5-5', 'claude-opus-5-5'];
+export const MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
 export const EFFORTS = ['low', 'medium', 'high'];
 
 // Matches the defaults at the top of style.css.
