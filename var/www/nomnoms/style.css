@@ -212,6 +212,9 @@ h1 {
 
 /* Outside .page, so it carries its own width and gutters */
 .site-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.5rem;
   max-width: 64rem;
   margin: 0 auto;
   padding: 0 1rem 2rem;
@@ -224,7 +227,8 @@ h1 {
 }
 
 .site-foot a { color: inherit; }
-.site-foot:empty { display: none; }
+/* Stays on the right even when the account links are empty */
+.site-foot .credit { margin-left: auto; }
 
 .link-button {
   padding: 0;
