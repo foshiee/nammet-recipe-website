@@ -298,7 +298,7 @@ What the service does to protect itself:
 
 ## Cost of Claude imports
 
-Imports use `claude-sonnet-5-5` at medium effort by default. That model costs $2 per million input tokens and $10 per million output tokens. Most of the cost is the output, meaning the recipe itself plus the model's reasoning. Expect roughly 2 to 5 US cents per recipe, and more for a long multi-page PDF. These are estimates, so check real figures in the Anthropic console after your first few imports.
+Imports use `claude-sonnet-5-5` at medium effort by default. At time of writing, that model costs $2 per million input tokens and $10 per million output tokens. Most of the cost is the output, meaning the recipe itself plus the model's reasoning. Expect roughly 2 to 5 US cents per recipe, and more for a long multi-page PDF. These are estimates, so check real figures in the Anthropic console after your first few imports.
 
 To change the model or effort, use the admin page (takes effect on the next import), or set `MODEL` / `EFFORT` in `/etc/nomnoms/api.env` and restart the service (`sudo systemctl restart nomnoms-api`). The admin page wins when both are set. `claude-haiku-5-5` costs about a twentieth as much ($0.10 and $0.50 per million tokens, a fraction of a cent per recipe) and handles clear pages and typed text well; check a few drafts closely before relying on it for photos and scans. If blurry photos or messy scanned PDFs come out wrong, `claude-opus-5-5` is more accurate at about twice the price of Sonnet.
 
