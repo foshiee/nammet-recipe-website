@@ -1408,7 +1408,7 @@
           <input id="ad-radius" type="range" name="radius" min="${o.radius.min}" max="${o.radius.max}" step="1" value="${look.radius}">
           <output id="ad-radius-out" for="ad-radius">${look.radius}px</output>
         </div>
-        <label class="check"><input type="checkbox" name="thumbnails"${look.thumbnails ? ' checked' : ''}> Show photos on the home page</label>
+        <label class="toggle"><input type="checkbox" role="switch" name="thumbnails"${look.thumbnails ? ' checked' : ''}><span>Show photos on the home page</span></label>
         <p class="hint">A small photo beside each recipe in the list. Recipes without a photo get an empty square.</p>
         <div class="actions">
           <button class="button" type="submit">Save appearance</button>
