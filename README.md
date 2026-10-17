@@ -28,7 +28,7 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 
 ```
 browser ──> Traefik [or reverse proxy of your choice] (HTTPS) ──> nginx ──> /var/www/nomnoms      static site and recipe JSON
-                                       └─> /api/ ──> Node service on 127.0.0.1:3000
+                                                                    └─> /api/ ──> Node service on 127.0.0.1:3000
 ```
 
 nginx lists the `recipes/` folder as JSON (`autoindex_format json`), and the app fetches that listing to find recipes. Dropping a new `.json` file into the folder makes it appear on the next page refresh. If you'd rather not use nginx's listing, a `recipes/index.json` holding an array of file names works too.
