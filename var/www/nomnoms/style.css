@@ -594,6 +594,40 @@ h2 {
   background: var(--tint);
   object-fit: cover;
 }
+
+/* Photo editor: a modal with a 3:2 frame, the shape of the recipe page's photo */
+.cropper {
+  width: min(40rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100vh - 2rem);
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.cropper::backdrop { background: rgb(0 0 0 / .65); }
+.cropper .actions { margin-top: 1.25rem; }
+
+.crop-frame {
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--tint);
+  cursor: grab;
+  touch-action: none; /* dragging and pinching move the photo, not the page */
+  user-select: none;
+}
+
+.crop-frame:active { cursor: grabbing; }
+.crop-frame:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.crop-frame canvas { display: block; width: 100%; aspect-ratio: 3 / 2; }
+
+.crop-zoom { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
+.crop-zoom label { font-weight: 600; }
+.crop-zoom input { flex: 1; max-width: 20rem; accent-color: var(--accent); }
+
 .slug-field { display: flex; align-items: center; gap: .35rem; max-width: 32rem; margin-bottom: .35rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 

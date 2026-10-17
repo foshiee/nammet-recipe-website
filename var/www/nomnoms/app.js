@@ -692,27 +692,215 @@
     }
   }
 
-  async function preparePhoto(blob) {
+  async function readPhoto(blob) {
     let src;
     try {
       src = await decodeImage(blob);
     } catch (e) {
       throw new Error("That photo couldn't be read. Try a JPEG, PNG or WebP image.");
     }
-    const w = src.naturalWidth || src.width;
-    const h = src.naturalHeight || src.height;
-    const scale = Math.min(1, PHOTO_EDGE / Math.max(w, h));
+    return { src, w: src.naturalWidth || src.width, h: src.naturalHeight || src.height };
+  }
+
+  // Draws part of a decoded photo (sx, sy, sw, sh in its own pixels) as the JPEG to upload
+  async function renderPhoto(src, sx, sy, sw, sh) {
+    const scale = Math.min(1, PHOTO_EDGE / Math.max(sw, sh));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(w * scale));
-    canvas.height = Math.max(1, Math.round(h * scale));
+    canvas.width = Math.max(1, Math.round(sw * scale));
+    canvas.height = Math.max(1, Math.round(sh * scale));
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff'; // transparent PNGs would otherwise turn black
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
-    if (src.close) src.close();
+    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
     if (!out) throw new Error("That photo couldn't be prepared. Try a smaller one.");
     return out;
+  }
+
+  // The whole photo, uncropped (used for the photo a web page publishes)
+  async function preparePhoto(blob) {
+    const p = await readPhoto(blob);
+    try {
+      return await renderPhoto(p.src, 0, 0, p.w, p.h);
+    } finally {
+      if (p.src.close) p.src.close();
+    }
+  }
+
+  /* photo editor: crop to the recipe page's 3:2 frame, with zoom and repositioning */
+
+  // editor = { src, w, h, preview, cx, cy, zoom, pointers, resolve, dialog, canvas }
+  // cx/cy is the photo pixel at the middle of the frame; zoom 1 just fills the frame.
+  let editor = null;
+  const ZOOM_MAX = 4;
+  const CROP_RATIO = 3 / 2; // matches .photo.hero and .crop-frame canvas in style.css
+
+  // Resolves with the cropped JPEG, or null if cancelled
+  async function editPhoto(blob) {
+    closeEditor(null);
+    const p = await readPhoto(blob);
+    // A smaller copy keeps dragging smooth; the saved photo is cut from the original
+    const scale = Math.min(1, 2000 / Math.max(p.w, p.h));
+    const preview = document.createElement('canvas');
+    preview.width = Math.max(1, Math.round(p.w * scale));
+    preview.height = Math.max(1, Math.round(p.h * scale));
+    preview.getContext('2d').drawImage(p.src, 0, 0, preview.width, preview.height);
+
+    const dialog = document.createElement('dialog');
+    dialog.className = 'cropper';
+    dialog.setAttribute('aria-labelledby', 'crop-h');
+    dialog.innerHTML = `
+      <h2 id="crop-h">Adjust photo</h2>
+      <p class="hint">Drag to move the photo, and zoom in to crop it. The frame shows how it will look at the top of the recipe.</p>
+      <div class="crop-frame" data-action="crop-frame" tabindex="0" role="application"
+        aria-label="Photo position. Arrow keys move it, plus and minus zoom.">
+        <canvas></canvas>
+      </div>
+      <div class="crop-zoom">
+        <label for="crop-zoom">Zoom</label>
+        <input id="crop-zoom" type="range" min="1" max="${ZOOM_MAX}" step="0.01" value="1" data-action="crop-zoom">
+      </div>
+      <div class="actions">
+        <button class="button" data-action="crop-done">Use photo</button>
+        <button class="button secondary" data-action="crop-reset">Reset</button>
+        <button class="button secondary" data-action="crop-cancel">Cancel</button>
+      </div>`;
+    app.appendChild(dialog);
+
+    return new Promise((resolve) => {
+      editor = { ...p, preview, cx: p.w / 2, cy: p.h / 2, zoom: 1, pointers: new Map(), resolve, dialog, canvas: dialog.querySelector('canvas') };
+      dialog.showModal();
+      dialog.querySelector('.crop-frame').focus();
+      drawCrop();
+    });
+  }
+
+  function closeEditor(result) {
+    const e = editor;
+    if (!e) return;
+    editor = null;
+    if (e.dialog.open) e.dialog.close();
+    e.dialog.remove();
+    if (e.src.close) e.src.close();
+    e.resolve(result);
+  }
+
+  // Frame size in CSS pixels, and photo pixels per CSS pixel at the current zoom. The
+  // height comes from the ratio rather than the layout, so the crop is exactly 3:2.
+  function cropView() {
+    const e = editor;
+    const fw = e.canvas.clientWidth || 1;
+    const fh = fw / CROP_RATIO;
+    const k = 1 / (Math.max(fw / e.w, fh / e.h) * e.zoom);
+    return { fw, fh, k, vw: fw * k, vh: fh * k };
+  }
+
+  // Keeps the frame filled: the photo can't be dragged or zoomed out past its edges
+  function clampCrop() {
+    const e = editor;
+    e.zoom = Math.min(ZOOM_MAX, Math.max(1, e.zoom));
+    const { vw, vh } = cropView();
+    e.cx = Math.min(e.w - vw / 2, Math.max(vw / 2, e.cx));
+    e.cy = Math.min(e.h - vh / 2, Math.max(vh / 2, e.cy));
+  }
+
+  function drawCrop() {
+    const e = editor;
+    if (!e) return;
+    clampCrop();
+    const { fw, fh, vw, vh } = cropView();
+    const dpr = window.devicePixelRatio || 1;
+    const c = e.canvas;
+    if (c.width !== Math.round(fw * dpr) || c.height !== Math.round(fh * dpr)) {
+      c.width = Math.round(fw * dpr);
+      c.height = Math.round(fh * dpr);
+    }
+    const ctx = c.getContext('2d');
+    const p = e.preview.width / e.w;
+    ctx.drawImage(e.preview, (e.cx - vw / 2) * p, (e.cy - vh / 2) * p, vw * p, vh * p, 0, 0, c.width, c.height);
+    const zoom = e.dialog.querySelector('#crop-zoom');
+    if (zoom && Number(zoom.value) !== e.zoom) zoom.value = e.zoom;
+  }
+
+  // Zooms by `factor`, keeping the point under (ax, ay) in the frame where it is
+  function zoomCrop(factor, ax, ay) {
+    const e = editor;
+    const before = cropView();
+    if (ax === undefined) { ax = before.fw / 2; ay = before.fh / 2; }
+    const ix = e.cx + (ax - before.fw / 2) * before.k;
+    const iy = e.cy + (ay - before.fh / 2) * before.k;
+    e.zoom = Math.min(ZOOM_MAX, Math.max(1, e.zoom * factor));
+    const after = cropView();
+    e.cx = ix - (ax - after.fw / 2) * after.k;
+    e.cy = iy - (ay - after.fh / 2) * after.k;
+    drawCrop();
+  }
+
+  function moveCrop(dx, dy) {
+    const { k } = cropView();
+    editor.cx -= dx * k;
+    editor.cy -= dy * k;
+    drawCrop();
+  }
+
+  async function finishCrop(btn) {
+    const e = editor;
+    e.dialog.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    btn.textContent = 'Preparing…';
+    const { vw, vh } = cropView();
+    try {
+      closeEditor(await renderPhoto(e.src, e.cx - vw / 2, e.cy - vh / 2, vw, vh));
+    } catch (err) {
+      closeEditor(null);
+      alert(err.message);
+    }
+  }
+
+  // Pointer position relative to the frame
+  const framePoint = (ev) => {
+    const r = editor.canvas.getBoundingClientRect();
+    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+  };
+
+  function cropPointerDown(ev) {
+    ev.preventDefault();
+    ev.target.setPointerCapture(ev.pointerId);
+    editor.pointers.set(ev.pointerId, framePoint(ev));
+  }
+
+  // One pointer drags; two pinch-zoom around their midpoint and drag with it
+  function cropPointerMove(ev) {
+    const e = editor;
+    const last = e.pointers.get(ev.pointerId);
+    if (!last) return;
+    const now = framePoint(ev);
+    if (e.pointers.size === 1) {
+      e.pointers.set(ev.pointerId, now);
+      moveCrop(now.x - last.x, now.y - last.y);
+      return;
+    }
+    const [a, b] = [...e.pointers.values()];
+    const mid0 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const dist0 = Math.hypot(a.x - b.x, a.y - b.y);
+    e.pointers.set(ev.pointerId, now);
+    const [c, d] = [...e.pointers.values()];
+    const mid1 = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 };
+    const dist1 = Math.hypot(c.x - d.x, c.y - d.y);
+    if (dist0 > 0) zoomCrop(dist1 / dist0, mid1.x, mid1.y);
+    moveCrop(mid1.x - mid0.x, mid1.y - mid0.y);
+  }
+
+  function cropKey(ev) {
+    const step = 20;
+    const keys = {
+      // The photo moves the way the arrow points, as if dragged
+      ArrowLeft: () => moveCrop(-step, 0), ArrowRight: () => moveCrop(step, 0),
+      ArrowUp: () => moveCrop(0, -step), ArrowDown: () => moveCrop(0, step),
+      '+': () => zoomCrop(1.1), '=': () => zoomCrop(1.1), '-': () => zoomCrop(1 / 1.1)
+    };
+    if (!keys[ev.key]) return;
+    ev.preventDefault();
+    keys[ev.key]();
   }
 
   function base64Blob(data, type) {
@@ -780,8 +968,18 @@
     drawPhotoTools();
   }
 
-  function changePhoto(file) {
-    if (file) photoRequest(async (slug) => uploadPhoto(slug, await preparePhoto(file)));
+  async function changePhoto(file) {
+    const r = state.current;
+    if (!file || !r) return;
+    let out;
+    try {
+      out = await editPhoto(file);
+    } catch (e) {
+      state.photo.msg = { slug: r.slug, text: e.message };
+      drawPhotoTools();
+      return;
+    }
+    if (out && state.current === r) photoRequest((slug) => uploadPhoto(slug, out));
   }
 
   function removePhoto() {
@@ -1030,21 +1228,31 @@
     state.imp = { busy: false, error: '', draft: null };
   }
 
-  async function setDraftPhoto(blob) {
+  // `source` is the original file, kept so "Adjust photo" can recrop it from scratch.
+  // A chosen file opens the editor; the web page's photo is used whole until adjusted.
+  async function setDraftPhoto(source, edit) {
     const d = state.imp.draft;
-    if (!d || !blob) return;
-    d.photoBusy = true;
+    if (!d || !source) return;
     d.photoMsg = '';
-    drawDraftPhoto();
+    let out;
     try {
-      const out = await preparePhoto(blob);
-      if (state.imp.draft !== d) return; // started over meanwhile
-      if (d.photo) URL.revokeObjectURL(d.photo.url);
-      d.photo = { blob: out, url: URL.createObjectURL(out) };
+      if (edit) {
+        out = await editPhoto(source);
+        if (!out) return; // cancelled: keep what was there
+      } else {
+        d.photoBusy = true;
+        drawDraftPhoto();
+        out = await preparePhoto(source);
+      }
     } catch (e) {
       d.photoMsg = e.message;
     }
     d.photoBusy = false;
+    if (state.imp.draft !== d) return; // started over meanwhile
+    if (out) {
+      if (d.photo) URL.revokeObjectURL(d.photo.url);
+      d.photo = { blob: out, url: URL.createObjectURL(out), source };
+    }
     drawDraftPhoto();
   }
 
@@ -1063,7 +1271,8 @@
         : '<p class="hint">Optional. A photo of the finished dish, shown at the top of the recipe.</p>'}
       <div class="actions">
         <button class="button secondary" data-action="pick-file" data-for="imp-photo-file"${dis}>${d.photo ? 'Choose another photo' : 'Choose photo'}</button>
-        ${d.photo ? `<button class="button secondary" data-action="imp-photo-remove"${dis}>Remove photo</button>` : ''}
+        ${d.photo ? `<button class="button secondary" data-action="imp-photo-edit"${dis}>Adjust photo</button>
+          <button class="button secondary" data-action="imp-photo-remove"${dis}>Remove photo</button>` : ''}
         <input id="imp-photo-file" type="file" accept="image/*" data-action="imp-photo-file" hidden>
       </div>
       ${d.photoBusy ? '<p class="working">Preparing the photo…</p>' : d.photoMsg ? `<p class="form-error">${esc(d.photoMsg)}</p>` : ''}`;
@@ -1773,6 +1982,7 @@
   const ACCOUNT_PAGES = ['#/import', '#/admin', '#/password'];
 
   function route() {
+    closeEditor(null);
     leaveRecipe();
     clearPreview();
     const m = location.hash.match(/^#\/r\/(.+)$/);
@@ -1830,6 +2040,15 @@
       }
       case 'photo-remove': removePhoto(); break;
       case 'imp-photo-remove': removeDraftPhoto(); break;
+      case 'imp-photo-edit':
+        if (state.imp.draft && state.imp.draft.photo) setDraftPhoto(state.imp.draft.photo.source, true);
+        break;
+      case 'crop-done': if (editor) finishCrop(el); break;
+      case 'crop-reset':
+        if (editor) Object.assign(editor, { cx: editor.w / 2, cy: editor.h / 2, zoom: 1 });
+        drawCrop();
+        break;
+      case 'crop-cancel': closeEditor(null); break;
       case 'imp-preview': drawPreview(); break;
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
@@ -1920,12 +2139,44 @@
       setWake(el.checked);
     } else if (el.dataset.action === 'user-role') {
       changeRole(el);
-    } else if (el.dataset.action === 'photo-file') {
-      changePhoto(el.files[0]);
-    } else if (el.dataset.action === 'imp-photo-file') {
-      setDraftPhoto(el.files[0]);
+    } else if (el.dataset.action === 'photo-file' || el.dataset.action === 'imp-photo-file') {
+      // Emptied straight away, so picking the same photo again after cancelling still works
+      const file = el.files[0];
+      el.value = '';
+      if (el.dataset.action === 'photo-file') changePhoto(file);
+      else setDraftPhoto(file, true);
     }
   });
+
+  // The photo editor's frame: drag, pinch, wheel and arrow keys
+  app.addEventListener('pointerdown', (e) => {
+    if (editor && e.target.closest('[data-action="crop-frame"]')) cropPointerDown(e);
+  });
+  app.addEventListener('pointermove', (e) => {
+    if (editor) cropPointerMove(e);
+  });
+  for (const type of ['pointerup', 'pointercancel']) {
+    app.addEventListener(type, (e) => {
+      if (editor) editor.pointers.delete(e.pointerId);
+    });
+  }
+  app.addEventListener('wheel', (e) => {
+    if (!editor || !e.target.closest('[data-action="crop-frame"]')) return;
+    e.preventDefault();
+    const pt = framePoint(e);
+    zoomCrop(Math.exp(-e.deltaY / 500), pt.x, pt.y);
+  }, { passive: false });
+  app.addEventListener('keydown', (e) => {
+    if (editor && e.target.closest('[data-action="crop-frame"]')) cropKey(e);
+  });
+  // Escape closes a dialog with a "cancel" event, which doesn't bubble
+  app.addEventListener('cancel', (e) => {
+    if (editor && e.target === editor.dialog) {
+      e.preventDefault();
+      closeEditor(null);
+    }
+  }, true);
+  window.addEventListener('resize', drawCrop);
 
   // A photo missing from the server is left out rather than shown broken. Load errors
   // don't bubble, so this listens in the capture phase.
@@ -1948,6 +2199,8 @@
     if (e.target.id === 'search') {
       state.query = e.target.value;
       drawList();
+    } else if (e.target.id === 'crop-zoom' && editor) {
+      zoomCrop(Number(e.target.value) / editor.zoom);
     } else if (e.target.id === 'imp-json' && state.imp.draft) {
       state.imp.draft.text = e.target.value;
     } else if (e.target.id === 'imp-slug' && state.imp.draft) {
