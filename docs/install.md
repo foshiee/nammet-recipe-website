@@ -151,11 +151,7 @@ sudo setfacl -m u:loginuser:rwx /var/www/nomnoms/photos
 sudo setfacl -d -m u:loginuser:rwx -m u:nomnoms:rwx /var/www/nomnoms/photos
 ```
 
-If uploads still fail:
-
-- **SELinux:** files uploaded over SFTP inherit the folder's label, so nginx can read them. If one isn't served, run `sudo restorecon -Rv /var/www/nomnoms`.
-- **Chroot:** if `loginuser` is chrooted or limited to `internal-sftp` in `sshd_config`, the chroot directory must be root-owned and not writable, so uploads must go into a writable subfolder.
-- **Permissions:** `loginuser` needs execute (`x`) on every parent folder. `/var/www/nomnoms` is `0755`, so this normally works.
+If uploads still fail, see [Troubleshooting](#troubleshooting).
 
 ### 8. Configuration
 
@@ -216,14 +212,14 @@ The address to use, and how to find it, is in the security checklist below.
 
 ### 13. Check it end to end
 
-1. Open the site in a browser over HTTPS. There should be a small **Sign in** link at the bottom of the home page. If it isn't there, force-refresh the page (Ctrl+F5) to drop the cached `app.js`.
+1. Open the site in a browser over HTTPS. There should be a small **Sign in** link at the bottom of the home page.
 2. Click it and sign in. You'll be asked to choose your own password (unless you used `--permanent`), then you should land on the import screen, and the home page should now show **Import recipe** at the top right.
 3. Import a recipe web page, such as one from BBC Good Food or Allrecipes. The review screen should say *Read from the recipe data the web page publishes*.
 4. Save it. You should land on the new recipe, and it should be on the home page.
 5. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
 6. Watch it all in the log: `journalctl -u nomnoms-api -f`.
 
-If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux setting from step 11, and `sudo tail /var/log/nginx/error.log`.
+If any of this doesn't work, see [Troubleshooting](#troubleshooting).
 
 ## Security checklist (Traefik in front)
 
@@ -301,6 +297,29 @@ What the service does to protect itself:
 Imports use `claude-sonnet-5-5` at medium effort by default. At time of writing, that model costs $2 per million input tokens and $10 per million output tokens. Most of the cost is the output, meaning the recipe itself plus the model's reasoning. Expect roughly 2 to 5 US cents per recipe, and more for a long multi-page PDF. These are estimates, so check real figures in the Anthropic console after your first few imports.
 
 To change the model or effort, use the admin page (takes effect on the next import), or set `MODEL` / `EFFORT` in `/etc/nomnoms/api.env` and restart the service (`sudo systemctl restart nomnoms-api`). The admin page wins when both are set. `claude-haiku-5-5` costs about a twentieth as much ($0.10 and $0.50 per million tokens, a fraction of a cent per recipe) and handles clear pages and typed text well; check a few drafts closely before relying on it for photos and scans. If blurry photos or messy scanned PDFs come out wrong, `claude-opus-5-5` is more accurate at about twice the price of Sonnet.
+
+## Troubleshooting
+
+Three logs explain most problems: the service's (`journalctl -u nomnoms-api -e`), nginx's (`sudo tail /var/log/nginx/error.log`) and SELinux's denials (`sudo ausearch -m avc -ts recent`).
+
+- **The service won't start.** `systemctl status nomnoms-api` shows the reason:
+  - `status=226/NAMESPACE`: a folder the service is allowed to write to doesn't exist. systemd needs all four (`/var/www/nomnoms/recipes`, `/var/www/nomnoms/photos`, `/var/www/nomnoms/theme` and `/var/lib/nomnoms`) before it will start the service. Create them as in step 5.
+  - `Failed to load environment files`: `/etc/nomnoms/api.env` is missing. See step 8.
+  - `ERR_MODULE_NOT_FOUND` in the log: the dependencies aren't installed. Run `npm ci` in `/opt/nomnoms-api` as in step 6.
+- ***The import service isn't available on this server.*** nginx can't reach the service. `curl -s http://127.0.0.1:3000/api/me` on the VM should print `{"user":null}`; if it doesn't, the service isn't running. If it does, the problem is between nginx and the service. `Permission denied` in nginx's error log means the SELinux setting from step 11 is off. If the error log shows nothing, nginx is probably missing the `/api/` block, so check that `/etc/nginx/conf.d/nomnoms.conf` is the copy from step 12.
+- ***Couldn't load the recipe list.*** nginx isn't returning the JSON listing of the recipes folder. Opening `/recipes/` on the site should show a list like `[{"name":"example-recipe.json","type":"file",...}]`. If it doesn't, check that the `location /recipes/` block is in `nomnoms.conf`, then run `sudo nginx -t && sudo systemctl reload nginx`. If you see nginx's welcome page instead of the site, another server block is answering; the `nginx.conf` from step 12 has the sample ones commented out.
+- **Signing in seems to work, but you're asked to sign in again straight away.** The browser isn't keeping the session cookie. With `COOKIE_SECURE=true`, the default, it's only kept over HTTPS, so signing in over plain HTTP, for example by opening the VM's address directly, can't work. Use the site's HTTPS address. Don't turn `COOKIE_SECURE` off to get round it.
+- ***Too many failed sign-in attempts* for everyone, or recipes failing with *HTTP 429*.** nginx sees every visitor as coming from Traefik's address, so they all share one rate limit. Fill in the real-IP lines, and trust Cloudflare's ranges if it's in front (see the [security checklist](#security-checklist-traefik-in-front)). The sign-in lockout clears after 15 minutes, or straight away when the service restarts.
+- **A recipe or photo you added by hand doesn't show.** A recipe file nginx can't serve is listed on the home page under *Some recipe files couldn't be read*, with the reason:
+  - *HTTP 403*: nginx isn't allowed to read the file. A file moved in with `mv` keeps the SELinux label from where it was, while copied and uploaded files take the folder's; `sudo restorecon -Rv /var/www/nomnoms` fixes the label. The file also needs to be readable by everyone (`chmod 644`).
+  - A JSON error: the file isn't valid JSON. `python3 -m json.tool file.json` shows where.
+
+  Only files ending in `.json` count as recipes.
+- **PDF, photo and text imports fail, but web pages import.** If the message says no Anthropic API key is set, add one on the admin page, or in `api.env` and restart the service. *The server's Anthropic API key was rejected* means the key is wrong or has been revoked; the admin page's **Test key** button checks a saved key.
+- **Uploads over SFTP fail.**
+  - **Write access:** the account needs the ACLs from step 7's SFTP section. `getfacl /var/www/nomnoms/recipes` should list it.
+  - **Chroot:** if the account is chrooted or limited to `internal-sftp` in `sshd_config`, the chroot directory must be root-owned and not writable, so uploads must go into a writable subfolder.
+  - **Permissions:** the account needs execute (`x`) on every parent folder. `/var/www/nomnoms` is `0755`, so this normally works.
 
 ## Trying it locally
 
