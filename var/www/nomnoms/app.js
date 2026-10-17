@@ -381,18 +381,14 @@
       (r) => (!state.tag || r.tags.includes(state.tag)) && words.every((w) => r.search.includes(w))
     );
 
-    // Photos beside each row, when switched on in the admin page. Rows without one keep an
-    // empty square so the titles line up.
-    const thumbs = state.site.thumbnails;
-    list.classList.toggle('with-thumbs', thumbs);
-    const thumb = (r) => !thumbs ? ''
-      : r.image ? `<img class="photo thumb" src="${esc(r.image)}" alt="" loading="lazy" decoding="async">`
-      : '<span class="thumb"></span>';
+    // A photo beside each row that has one, when switched on in the admin page. Rows
+    // without a photo look the same as with the setting off.
+    const thumb = (r) => state.site.thumbnails && r.image;
 
     list.innerHTML = shown.map((r) => `
       <li>
-        <a class="row" href="#/r/${encodeURIComponent(r.slug)}">
-          ${thumb(r)}
+        <a class="row${thumb(r) ? ' has-thumb' : ''}" href="#/r/${encodeURIComponent(r.slug)}">
+          ${thumb(r) ? `<img class="photo thumb" src="${esc(r.image)}" alt="" loading="lazy" decoding="async">` : ''}
           <span class="row-title">${esc(r.title)}</span>
           ${r.description ? `<span class="row-desc">${esc(r.description)}</span>` : ''}
           <span class="row-meta"><span>Serves ${esc(r.servings)}</span>${r.time ? `<span>${esc(r.time)}</span>` : ''}</span>
@@ -1409,7 +1405,7 @@
           <output id="ad-radius-out" for="ad-radius">${look.radius}px</output>
         </div>
         <label class="toggle"><input type="checkbox" role="switch" name="thumbnails"${look.thumbnails ? ' checked' : ''}><span>Show photos on the home page</span></label>
-        <p class="hint">A small photo beside each recipe in the list. Recipes without a photo get an empty square.</p>
+        <p class="hint">A small photo beside each recipe in the list that has one. Recipes without a photo look the same as before.</p>
         <div class="actions">
           <button class="button" type="submit">Save appearance</button>
           <button class="button secondary" type="button" data-action="admin-look-undo">Undo changes</button>
@@ -1936,13 +1932,9 @@
   app.addEventListener('error', (e) => {
     const img = e.target;
     if (!(img instanceof HTMLImageElement) || !img.classList.contains('photo')) return;
-    if (img.classList.contains('thumb')) {
-      const blank = document.createElement('span');
-      blank.className = 'thumb';
-      img.replaceWith(blank);
-    } else {
-      img.remove();
-    }
+    const row = img.closest('.has-thumb');
+    if (row) row.classList.remove('has-thumb');
+    img.remove();
   }, true);
 
   // API keys and passwords typed on the admin page can't be copied or dragged back out

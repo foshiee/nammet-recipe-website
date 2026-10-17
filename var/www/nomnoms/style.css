@@ -188,10 +188,10 @@ h1 {
   .row-meta { grid-column: 2; grid-row: 1 / span 2; flex-direction: column; gap: .15rem; text-align: right; }
 }
 
-/* Home-page photos, when switched on in the admin page */
-.with-thumbs .row { grid-template-columns: 4rem 1fr; }
-.with-thumbs .row > * { grid-column: 2; }
-.with-thumbs .thumb { grid-column: 1; grid-row: 1 / span 3; }
+/* Home-page photos, when switched on in the admin page. Only rows with a photo change. */
+.row.has-thumb { grid-template-columns: 4rem 1fr; }
+.has-thumb > * { grid-column: 2; }
+.has-thumb > .thumb { grid-column: 1; grid-row: 1 / span 3; }
 
 .thumb {
   display: block;
@@ -203,9 +203,9 @@ h1 {
 }
 
 @media (min-width: 40rem) {
-  .with-thumbs .row { grid-template-columns: 4.5rem 1fr auto; }
-  .with-thumbs .row-meta { grid-column: 3; }
-  .with-thumbs .thumb { grid-row: 1 / span 2; width: 4.5rem; }
+  .row.has-thumb { grid-template-columns: 4.5rem 1fr auto; }
+  .has-thumb > .row-meta { grid-column: 3; }
+  .has-thumb > .thumb { grid-row: 1 / span 2; width: 4.5rem; }
 }
 
 .empty { margin: 1.5rem 0; color: var(--muted); }
