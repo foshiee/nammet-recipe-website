@@ -17,11 +17,11 @@ The static site still works without any of this. If the service is down, browsin
 ```
 browser ──HTTPS──> Reverse Proxy [Traefik] ──HTTP──> nginx :80 ──> /var/www/nomnoms        (static site)
                                                        └─ /api/ ──> nomnoms-api :3000   (Node, 127.0.0.1 only)
-                                                       ├─ reads/writes /var/lib/nomnoms/users.json, settings.json
-                                                       ├─ writes /var/www/nomnoms/recipes/<name>.json
-                                                       ├─ writes /var/www/nomnoms/photos/<name>-<hash>.jpg
-                                                       ├─ writes /var/www/nomnoms/theme/ (theme.css, site.json, favicon)
-                                                       └─ calls  api.anthropic.com (only when needed)
+                                                                       ├─ reads/writes /var/lib/nomnoms/users.json, settings.json
+                                                                       ├─ writes /var/www/nomnoms/recipes/<name>.json
+                                                                       ├─ writes /var/www/nomnoms/photos/<name>-<hash>.jpg
+                                                                       ├─ writes /var/www/nomnoms/theme/ (theme.css, site.json, favicon)
+                                                                       └─ calls  api.anthropic.com (only when needed)
 ```
 
 How each input is converted:
