@@ -5,6 +5,7 @@
   "time": "30 min",
   "tags": ["pasta", "vegetarian", "quick"],
   "source": "Adapted from a favourite cookbook (or paste a web address here)",
+  "image": "photos/example-recipe.jpg",
   "ingredients": [
     { "amount": 3, "unit": "tbsp", "name": "olive oil" },
     "water for boiling the pasta",

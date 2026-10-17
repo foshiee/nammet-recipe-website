@@ -110,6 +110,31 @@ function stepsFrom(instructions) {
   return steps;
 }
 
+// The recipe's photo address: schema.org allows a URL, an ImageObject, or a list of either
+export function imageFrom(v, depth = 0) {
+  if (v === null || v === undefined || depth > 4) return '';
+  if (typeof v === 'string') return v.trim();
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      const u = imageFrom(x, depth + 1);
+      if (u) return u;
+    }
+    return '';
+  }
+  return typeof v === 'object' ? imageFrom(v.url || v.contentUrl, depth + 1) : '';
+}
+
+// The page's sharing image, for pages without recipe data
+export function pageImage(html) {
+  for (const m of String(html).matchAll(/<meta\b[^>]*>/gi)) {
+    if (!/\b(?:property|name)\s*=\s*["']?(?:og:image|og:image:url|twitter:image)["'\s>\/]/i.test(m[0])) continue;
+    const c = m[0].match(/\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const url = c && (c[1] ?? c[2] ?? c[3]).trim().replace(/&amp;/g, '&');
+    if (url) return url;
+  }
+  return '';
+}
+
 // schema.org Recipe -> our recipe format
 export function mapJsonLdRecipe(r, pageUrl) {
   const out = {};

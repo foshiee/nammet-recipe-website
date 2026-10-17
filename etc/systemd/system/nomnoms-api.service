@@ -14,11 +14,11 @@ ExecStart=/usr/bin/node /opt/nomnoms-api/server.js
 Restart=on-failure
 RestartSec=5
 
-# Hardening: the service can only write to the recipes folder, the generated theme
-# files, and its own data folder (users and admin-page settings)
+# Hardening: the service can only write to the recipes and photos folders, the
+# generated theme files, and its own data folder (users and admin-page settings)
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/www/nomnoms/recipes /var/www/nomnoms/theme /var/lib/nomnoms
+ReadWritePaths=/var/www/nomnoms/recipes /var/www/nomnoms/photos /var/www/nomnoms/theme /var/lib/nomnoms
 ProtectHome=true
 PrivateTmp=true
 PrivateDevices=true

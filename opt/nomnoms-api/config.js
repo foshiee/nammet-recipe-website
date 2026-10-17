@@ -11,6 +11,8 @@ export const config = {
   port: num(env.PORT, 3000),
 
   recipesDir: env.RECIPES_DIR || '/var/www/nomnoms/recipes',
+  // Public folder for recipe photos uploaded through the site (see photos.js)
+  photosDir: env.PHOTOS_DIR || '/var/www/nomnoms/photos',
   usersFile: env.USERS_FILE || '/var/lib/nomnoms/users.json',
 
   // Admin page settings (appearance, Claude key/model/effort), and the public folder

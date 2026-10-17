@@ -188,6 +188,26 @@ h1 {
   .row-meta { grid-column: 2; grid-row: 1 / span 2; flex-direction: column; gap: .15rem; text-align: right; }
 }
 
+/* Home-page photos, when switched on in the admin page */
+.with-thumbs .row { grid-template-columns: 4rem 1fr; }
+.with-thumbs .row > * { grid-column: 2; }
+.with-thumbs .thumb { grid-column: 1; grid-row: 1 / span 3; }
+
+.thumb {
+  display: block;
+  width: 4rem;
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  background: var(--tint);
+  object-fit: cover;
+}
+
+@media (min-width: 40rem) {
+  .with-thumbs .row { grid-template-columns: 4.5rem 1fr auto; }
+  .with-thumbs .row-meta { grid-column: 3; }
+  .with-thumbs .thumb { grid-row: 1 / span 2; width: 4.5rem; }
+}
+
 .empty { margin: 1.5rem 0; color: var(--muted); }
 
 /* Outside .page, so it carries its own width and gutters */
@@ -227,6 +247,22 @@ h1 {
 .back:hover { text-decoration: underline; }
 
 .recipe-head h1 { font-size: clamp(2rem, 6.5vw, 3.5rem); max-width: 22ch; }
+
+/* Capped in height so the ingredients stay near the top on a phone */
+.photo.hero {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  max-height: min(28rem, 55vh);
+  margin-bottom: 1.5rem;
+  border-radius: var(--radius);
+  background: var(--tint);
+  object-fit: cover;
+}
+
+.photo-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.photo-tools .button { padding: .35rem .8rem; font-size: .875rem; }
+.photo-msg p { margin: .5rem 0 0; }
 
 .desc {
   max-width: 40rem;
@@ -318,6 +354,7 @@ h1 {
 
 /* Shared checkbox look */
 .wake input,
+.check input,
 .ing input {
   position: relative;
   flex: none;
@@ -333,9 +370,11 @@ h1 {
 }
 
 .wake input:checked,
+.check input:checked,
 .ing input:checked { background: var(--accent); border-color: var(--accent); }
 
 .wake input:checked::after,
+.check input:checked::after,
 .ing input:checked::after {
   content: "";
   position: absolute;
@@ -546,6 +585,18 @@ h2 {
 }
 
 .save-bar label { display: block; margin-bottom: .35rem; font-weight: 600; }
+.save-bar .field-label { margin: 0 0 .35rem; font-family: inherit; font-size: 1rem; font-weight: 600; border: 0; padding: 0; }
+.imp-photo { margin-bottom: 1.5rem; }
+.imp-photo .actions { margin-top: .5rem; }
+.photo.draft {
+  display: block;
+  width: 100%;
+  max-width: 20rem;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--radius);
+  background: var(--tint);
+  object-fit: cover;
+}
 .slug-field { display: flex; align-items: center; gap: .35rem; max-width: 32rem; margin-bottom: .35rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 
@@ -574,6 +625,7 @@ h2 {
 .range-row { display: flex; align-items: center; gap: .75rem; }
 .range-row input[type="range"] { flex: 1; max-width: 20rem; accent-color: var(--accent); }
 .range-row output { min-width: 3.5em; font-variant-numeric: tabular-nums; }
+.admin-form > .check { display: inline-flex; align-items: center; gap: .6rem; justify-self: start; font-weight: 400; cursor: pointer; }
 .admin-form h3 { margin: 0; font-family: var(--font-heading); font-size: 1.15rem; }
 
 .key-status { margin: .5rem 0 0; }
@@ -689,7 +741,8 @@ h2 {
 @media print {
   /* html:root outranks the colours in theme/theme.css */
   html:root { --bg: #fff; --ink: #000; --muted: #333; --line: #bbb; --accent: #000; }
-  .back, .controls, .wake, .timer-slot, .tags, .button, .site-foot { display: none !important; }
+  .back, .controls, .wake, .timer-slot, .tags, .button, .photo-tools, .site-foot { display: none !important; }
+  .photo.hero { max-height: 8cm; }
   .page { padding: 0; }
   .cols { grid-template-columns: 1fr 1.6fr; gap: 2rem; }
   .step, .ing { break-inside: avoid; }

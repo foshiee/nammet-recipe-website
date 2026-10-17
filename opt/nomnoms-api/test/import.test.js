@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseIngredient } from '../import/ingredient.js';
-import { extractJsonLdRecipe, mapJsonLdRecipe } from '../import/jsonld.js';
+import { extractJsonLdRecipe, imageFrom, mapJsonLdRecipe, pageImage } from '../import/jsonld.js';
 import { validateRecipe } from '../import/validate.js';
 import { stepTimer, htmlToText } from '../import/text.js';
 import { isPublicAddress, fetchUrl } from '../import/fetch-url.js';
@@ -64,6 +64,33 @@ test('schema.org JSON-LD page', () => {
   assert.deepEqual(r.steps[1], { text: 'Leave for 30 minutes.', timer: 1800 });
   assert.deepEqual(r.steps[2], { title: 'Roast', text: 'Roast at 200°C for 40 minutes.', timer: 2400 });
   assert.deepEqual(validateRecipe(r).errors, []);
+});
+
+test('recipe photos from web pages', () => {
+  assert.equal(imageFrom('https://example.com/a.jpg'), 'https://example.com/a.jpg');
+  assert.equal(imageFrom(['https://example.com/1x1.jpg', 'https://example.com/16x9.jpg']), 'https://example.com/1x1.jpg');
+  assert.equal(imageFrom({ '@type': 'ImageObject', url: 'https://example.com/b.jpg', width: 1200 }), 'https://example.com/b.jpg');
+  assert.equal(imageFrom([{ '@type': 'ImageObject', contentUrl: '/c.jpg' }]), '/c.jpg');
+  assert.equal(imageFrom([[{ url: '' }], { url: 'https://example.com/d.jpg' }]), 'https://example.com/d.jpg');
+  assert.equal(imageFrom({ '@id': '#primaryimage' }), '');
+  assert.equal(imageFrom(undefined), '');
+
+  assert.equal(pageImage('<head><meta property="og:image" content="https://example.com/og.jpg?a=1&amp;b=2"></head>'), 'https://example.com/og.jpg?a=1&b=2');
+  assert.equal(pageImage("<meta content='/tw.png' name='twitter:image'>"), '/tw.png');
+  assert.equal(pageImage('<meta property="og:image:width" content="1200">'), '');
+});
+
+test('recipe image field', () => {
+  const base = { title: 'x', steps: ['Cook.'] };
+  const ok = validateRecipe({ ...base, image: 'photos/x-0123456789.jpg', author: 'me' });
+  assert.equal(ok.recipe.image, 'photos/x-0123456789.jpg');
+  assert.deepEqual(Object.keys(ok.recipe), ['title', 'image', 'steps', 'author']);
+  for (const image of ['https://example.com/x.jpg', 'photos/../users.json', 'photos/a/b.jpg', '/photos/x.jpg', 'photos/x.svg', 'photos/.hidden.jpg', 42]) {
+    const v = validateRecipe({ ...base, image });
+    assert.equal(v.recipe.image, undefined, String(image));
+    assert.deepEqual(v.errors, []);
+    assert.ok(v.warnings.some((w) => w.includes("isn't a photo stored on this site")), String(image));
+  }
 });
 
 test('html to text', () => {

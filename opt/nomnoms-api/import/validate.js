@@ -4,7 +4,11 @@
 
 import { normalizeFractions, toAmount } from './ingredient.js';
 
-const KNOWN = ['title', 'description', 'servings', 'time', 'tags', 'source', 'ingredients', 'steps', 'notes'];
+const KNOWN = ['title', 'description', 'servings', 'time', 'tags', 'source', 'image', 'ingredients', 'steps', 'notes'];
+
+// A photo in the site's photos folder. Outside addresses aren't allowed, so pages never load
+// anything from other sites. The same pattern is in app.js.
+export const IMAGE_RE = /^photos\/[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:jpe?g|png|webp)$/;
 
 const QTY_RE = /\b\d+(?:[.,/]\d+)?\s*(?:g|kg|ml|l|oz|lbs?|cups?|tbsp|tsp|tablespoons?|teaspoons?|grams?|pounds?|ounces?|litres?|liters?)\b/i;
 
@@ -27,6 +31,11 @@ export function validateRecipe(raw) {
   for (const key of ['description', 'time', 'source']) {
     const v = str(raw[key]);
     if (v) r[key] = v;
+  }
+
+  if (raw.image !== undefined && raw.image !== null && raw.image !== '') {
+    if (typeof raw.image === 'string' && IMAGE_RE.test(raw.image.trim())) r.image = raw.image.trim();
+    else warnings.push(`The image "${str(raw.image) || '(not text)'}" isn't a photo stored on this site, so it was left out. Add one in the Photo section.`);
   }
 
   if (raw.servings !== undefined && raw.servings !== null && raw.servings !== '') {

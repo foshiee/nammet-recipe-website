@@ -1,9 +1,11 @@
 // Turns an uploaded file, a web address or pasted text into a draft recipe.
 // Structured inputs are converted directly; everything else goes to Claude.
 //
-// Result: { recipe, method: 'json' | 'jsonld' | 'claude', errors, warnings, slug }
+// Result: { recipe, method: 'json' | 'jsonld' | 'claude', errors, warnings, slug, photo? }
+// photo = { mediaType, data (base64) }: the picture a web page publishes for the recipe.
+// It isn't saved here; the browser shows it on the review screen and uploads it with the recipe.
 
-import { extractJsonLdRecipe, findRecipeObject, mapJsonLdRecipe } from './jsonld.js';
+import { extractJsonLdRecipe, findRecipeObject, imageFrom, mapJsonLdRecipe, pageImage } from './jsonld.js';
 import { extractWithClaude, LlmError } from './llm.js';
 import { fetchUrl, FetchError } from './fetch-url.js';
 import { htmlToText } from './text.js';
@@ -84,30 +86,57 @@ async function fromSniffed(s, buffer, { url } = {}) {
       }
       if (looksLikeOurFormat(data)) return finish(data, 'json');
       const ld = findRecipeObject(data);
-      if (ld) return finish(mapJsonLdRecipe(ld, url), 'jsonld');
+      if (ld) return { ...finish(mapJsonLdRecipe(ld, url), 'jsonld'), photoUrl: imageFrom(ld.image) };
       throw new ImportError("That JSON file isn't a recipe in this site's format or schema.org format.");
     }
     case 'html': {
       const ld = extractJsonLdRecipe(s.text);
-      if (ld) return finish(mapJsonLdRecipe(ld, url), 'jsonld');
+      const photoUrl = (ld && imageFrom(ld.image)) || pageImage(s.text);
+      if (ld) return { ...finish(mapJsonLdRecipe(ld, url), 'jsonld'), photoUrl };
       const result = await viaClaude({ kind: 'html', text: htmlToText(s.text), url });
       if (url && !result.recipe.source) result.recipe.source = url;
-      return result;
+      return { ...result, photoUrl };
     }
     default:
       return viaClaude({ kind: 'text', text: s.text });
   }
 }
 
-export function importFile(buffer) {
+// Photos are only fetched for web pages: a saved file's image addresses may not resolve
+const withoutPhoto = ({ photoUrl, ...result }) => result;
+
+export async function importFile(buffer) {
   if (!buffer || !buffer.length) throw new ImportError('The file is empty.');
-  return fromSniffed(sniff(buffer), buffer);
+  return withoutPhoto(await fromSniffed(sniff(buffer), buffer));
 }
 
-export function importText(text) {
+export async function importText(text) {
   text = String(text || '').trim();
   if (!text) throw new ImportError('Paste some recipe text first.');
-  return fromSniffed(sniff(Buffer.from(text, 'utf8')), Buffer.from(text, 'utf8'));
+  return withoutPhoto(await fromSniffed(sniff(Buffer.from(text, 'utf8')), Buffer.from(text, 'utf8')));
+}
+
+const MAX_PAGE_PHOTO_BYTES = 5 * 1024 * 1024;
+
+// Browsers can turn any of these into the JPEG that's uploaded
+export function photoType(b) {
+  const s = sniff(b);
+  if (s.kind === 'image') return s.mediaType;
+  if (b.length > 12 && b.toString('latin1', 4, 8) === 'ftyp' && /^avi[fs]$/.test(b.toString('latin1', 8, 12))) return 'image/avif';
+  return null;
+}
+
+// Same protection as the page itself: public addresses only, size and time capped
+async function fetchPhoto(src, pageUrl) {
+  let url;
+  try {
+    url = new URL(src, pageUrl).toString();
+  } catch {
+    return null;
+  }
+  const res = await fetchUrl(url, { maxBytes: MAX_PAGE_PHOTO_BYTES, timeoutMs: 10000 });
+  const mediaType = photoType(res.buffer);
+  return mediaType ? { mediaType, data: res.buffer.toString('base64') } : null;
 }
 
 export async function importUrl(url, maxBytes) {
@@ -119,5 +148,11 @@ export async function importUrl(url, maxBytes) {
     throw e;
   }
   if (!page.buffer.length) throw new ImportError('The page was empty.');
-  return fromSniffed(sniff(page.buffer), page.buffer, { url: page.finalUrl });
+  const { photoUrl, ...result } = await fromSniffed(sniff(page.buffer), page.buffer, { url: page.finalUrl });
+  if (photoUrl) {
+    const photo = await fetchPhoto(photoUrl, page.finalUrl).catch(() => null);
+    if (photo) result.photo = photo;
+    else result.warnings.push("The page's photo couldn't be downloaded. You can add one below.");
+  }
+  return result;
 }

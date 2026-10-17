@@ -12,6 +12,8 @@
 // Importers and admins:
 //   POST /api/import    multipart "file", or JSON { url } or { text }  -> draft recipe (nothing saved)
 //   POST /api/recipes   { slug, recipe, overwrite? }                   -> writes recipes/<slug>.json
+//   POST /api/recipes/photo          multipart "slug" + "file" (JPEG)    -> writes photos/, sets "image"
+//   POST /api/recipes/photo/delete   { slug }
 //
 // Admins only:
 //   GET  /api/admin/settings       -> appearance, Claude settings (never the key itself), options
@@ -40,6 +42,7 @@ import { importFile, importText, importUrl, ImportError } from './import/index.j
 import { testKey, LlmError } from './import/llm.js';
 import { validateRecipe } from './import/validate.js';
 import { saveRecipe, SaveError } from './save.js';
+import * as photos from './photos.js';
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -113,11 +116,13 @@ function readUpload(req, maxBytes = config.maxUploadBytes) {
     }
     let file = null;
     let tooBig = false;
+    const fields = {};
+    bb.on('field', (name, value) => { fields[name] = value; });
     bb.on('file', (name, stream, info) => {
       const chunks = [];
       stream.on('data', (c) => chunks.push(c));
       stream.on('limit', () => { tooBig = true; });
-      stream.on('end', () => { file = { buffer: Buffer.concat(chunks), filename: info.filename }; });
+      stream.on('end', () => { file = { buffer: Buffer.concat(chunks), filename: info.filename, fields }; });
     });
     bb.on('error', () => reject(new HttpError(400, 'The upload could not be read.')));
     bb.on('close', () => {
@@ -233,9 +238,31 @@ const routes = {
     const { slug, recipe, overwrite } = await readJson(req, 512 * 1024);
     const v = validateRecipe(recipe);
     if (v.errors.length) return send(res, 422, { error: 'The recipe has problems that need fixing first.', errors: v.errors, warnings: v.warnings });
+    // Replacing a recipe keeps its photo unless the new file names another one
+    const previous = overwrite === true ? await photos.currentImage(slug) : '';
+    if (previous && !v.recipe.image) v.recipe = validateRecipe({ ...v.recipe, image: previous }).recipe;
     const saved = await saveRecipe(slug, v.recipe, { overwrite: overwrite === true });
+    await photos.replacedPhoto(slug, previous, v.recipe.image);
     console.log(`saved by ${user.username}: ${saved.file}${overwrite ? ' (replaced)' : ''}`);
     send(res, 201, { ...saved, warnings: v.warnings });
+  },
+
+  'POST /api/recipes/photo': async (req, res) => {
+    const user = requireImporter(req);
+    if (!/^multipart\/form-data\b/i.test(req.headers['content-type'] || '')) throw new HttpError(415, 'Expected a file upload.');
+    const file = await readUpload(req, photos.MAX_PHOTO_BYTES);
+    const slug = String(file.fields.slug || '');
+    const result = await photos.setPhoto(slug, file.buffer);
+    console.log(`photo by ${user.username}: ${result.image} for ${slug} (${file.buffer.length} bytes)`);
+    send(res, 200, result);
+  },
+
+  'POST /api/recipes/photo/delete': async (req, res) => {
+    const user = requireImporter(req);
+    const { slug } = await readJson(req, 16 * 1024);
+    const result = await photos.removePhoto(String(slug || ''));
+    console.log(`photo removed by ${user.username}: ${slug}`);
+    send(res, 200, result);
   },
 
   /* ---------- admin ---------- */
@@ -325,7 +352,7 @@ const routes = {
 
 /* ---------- local testing: serve the static site too ---------- */
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 
 async function serveStatic(req, res) {
   const root = path.resolve(config.devStaticRoot);
@@ -363,7 +390,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.headers['x-requested-with'] !== 'nomnoms') throw new HttpError(403, 'Missing request header.');
     await handler(req, res);
   } catch (e) {
-    const known = [HttpError, ImportError, SaveError, LlmError, settings.SettingsError, auth.UserError];
+    const known = [HttpError, ImportError, SaveError, LlmError, settings.SettingsError, auth.UserError, photos.PhotoError];
     const status = known.some((k) => e instanceof k) ? e.status : 500;
     if (status === 500) console.error(`${req.method} ${pathname}:`, e);
     if (!res.headersSent) send(res, status, { error: status === 500 ? 'Something went wrong on the server.' : e.message });
@@ -375,7 +402,7 @@ await settings.loadSettings();
 server.requestTimeout = 120_000;
 server.listen(config.port, config.host, () => {
   console.log(`nomnoms-api listening on http://${config.host}:${config.port}`);
-  console.log(`recipes: ${path.resolve(config.recipesDir)}  users: ${path.resolve(config.usersFile)}`);
+  console.log(`recipes: ${path.resolve(config.recipesDir)}  photos: ${path.resolve(config.photosDir)}  users: ${path.resolve(config.usersFile)}`);
   console.log(`settings: ${path.resolve(config.settingsFile)}  theme: ${path.resolve(config.themeDir)}`);
   if (config.devStaticRoot) console.log(`dev mode: also serving ${path.resolve(config.devStaticRoot)}`);
   if (!settings.keyStatus().set) console.log('No Anthropic API key is set: PDF, photo and plain-text imports are disabled until one is added.');

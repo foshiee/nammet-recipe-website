@@ -43,6 +43,7 @@ Only the ingredients and steps are needed to get a usable page:
 | `time` | string | No | Free text such as `"1 hr 45 min"`. Shown on the home page as written, and on the recipe page with "total" added after it. |
 | `tags` | list of strings | No | Become filter buttons on the home page and are included in search. Converted to lowercase. |
 | `source` | string | No | Where the recipe came from. A value starting with `http://` or `https://` becomes a link; anything else is shown as plain text. |
+| `image` | string | No | A photo of the finished dish, shown at the top of the recipe page. It names a file in the site's `photos/` folder, such as `"photos/garlic-tomato-spaghetti.jpg"`. See "Photos". |
 | `ingredients` | list | No | The ingredient list. See the next section. |
 | `steps` | list | No | The method. See "Steps and timers". |
 | `notes` | list of strings | No | Tips shown as bullet points at the bottom of the page. A single string also works. |
@@ -133,9 +134,19 @@ A timer counts down on the button and can be stopped with a tap. At zero, the de
 
 Common durations: 60 is 1 minute, 600 is 10 minutes, 900 is 15 minutes, 3600 is 1 hour.
 
+## Photos
+
+The easiest way to add a photo is on the site. Sign in, open the recipe and use **Add photo**, or choose one on the import screen before saving. Importing from a web page offers the page's own photo. Photos added this way are scaled down to 1600 pixels on the long side and saved as JPEG without the camera's details (such as where the photo was taken), as `photos/<file name>-<code>.jpg`. The site fills in `image` for you. Replacing or removing the photo deletes the old file.
+
+To add one by hand, copy the file into `/var/www/nomnoms/photos/` on the server and set `image` to `"photos/"` followed by its name. The name may use letters, numbers, dots, hyphens and underscores, must start with a letter or number, and must end in `.jpg`, `.jpeg`, `.png` or `.webp`. Make large photos smaller first: 1600 pixels across is plenty. Browsers may keep showing the old version of a file for up to a day, so give a changed photo a new name. The site never deletes photos added by hand.
+
+Only files in the site's own `photos/` folder work. Addresses on other websites are ignored, and the import screen leaves them out with a warning, so visitors' browsers never contact other sites. If the file is missing, the recipe shows without a photo.
+
+The home page can show a small copy of each photo beside the recipe's name. An admin turns this on with **Show photos on the home page** on the admin page.
+
 ## What the home page uses
 
-The home page lists recipes alphabetically by `title`. Each row shows the title, `description`, `servings` and `time`. Search matches against the title, description, tags and every ingredient name, and a search with several words requires all of them to match. Tag buttons narrow the list to recipes carrying that tag.
+The home page lists recipes alphabetically by `title`. Each row shows the title, `description`, `servings` and `time`, and the `image` when photos on the home page are turned on. Search matches against the title, description, tags and every ingredient name, and a search with several words requires all of them to match. Tag buttons narrow the list to recipes carrying that tag.
 
 ## JSON syntax rules
 

@@ -24,7 +24,8 @@ User-agent: Timpibot
 User-agent: YouBot
 Disallow: /
 
-# Everyone else: the page itself, but not the raw recipe files or the API
+# Everyone else: the page itself, but not the raw recipe files, their photos or the API
 User-agent: *
 Disallow: /recipes/
+Disallow: /photos/
 Disallow: /api/

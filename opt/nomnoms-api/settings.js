@@ -4,7 +4,7 @@
 // API key). Every save also regenerates public files in THEME_DIR, which the static site
 // loads directly, so the site keeps its look even when this service is down:
 //   theme.css    CSS variables that override the defaults at the top of style.css
-//   site.json    { name, favicon } read by app.js
+//   site.json    { name, favicon, thumbnails } read by app.js
 //   favicon.*    an SVG made from the chosen emoji, or the uploaded image
 //
 // Only checked values ever reach theme.css (hex colours, font keys, a whole-pixel radius),
@@ -142,7 +142,9 @@ export const DEFAULT_APPEARANCE = {
   theme: 'sea-glass',
   colors: structuredClone(THEMES['sea-glass'].colors),
   fonts: { heading: 'classic-serif', body: 'system-sans' },
-  radius: 8
+  radius: 8,
+  // Recipe photos on the home page's list
+  thumbnails: false
 };
 
 const DEFAULTS = { appearance: DEFAULT_APPEARANCE, ai: { model: null, effort: null }, apiKey: null };
@@ -208,6 +210,8 @@ export function validateAppearance(input, current = DEFAULT_APPEARANCE, { checkC
   const r = input.radius;
   if (!Number.isInteger(r) || r < RADIUS.min || r > RADIUS.max) throw new SettingsError(`Corner rounding must be a whole number from ${RADIUS.min} to ${RADIUS.max}.`);
   out.radius = r;
+
+  out.thumbnails = input.thumbnails === true;
   return out;
 }
 
@@ -282,7 +286,7 @@ async function writeThemeFiles(a) {
   }
 
   await writeAtomic(path.join(dir, 'theme.css'), renderThemeCss(a), 0o644);
-  const site = { name: a.siteName, favicon: `theme/${faviconFile}?v=${version(faviconData)}` };
+  const site = { name: a.siteName, favicon: `theme/${faviconFile}?v=${version(faviconData)}`, thumbnails: a.thumbnails };
   await writeAtomic(path.join(dir, 'site.json'), JSON.stringify(site, null, 2) + '\n', 0o644);
 }
 

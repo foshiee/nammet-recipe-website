@@ -179,9 +179,14 @@
     user: null,
     userKnown: false,
     imp: { busy: false, error: '', draft: null },
-    site: { name: 'Recipes' },
+    site: { name: 'Recipes', thumbnails: false },
+    photo: { busy: false, msg: null },
     admin: null
   };
+
+  // A photo in the site's photos folder; anything else (such as another site's address) is
+  // ignored. The same pattern is in opt/nomnoms-api/import/validate.js.
+  const IMAGE_RE = /^photos\/[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:jpe?g|png|webp)$/;
 
   function normalizeGroups(raw) {
     if (!Array.isArray(raw)) return [];
@@ -224,7 +229,8 @@
       groups,
       steps,
       notes: notes.map(String),
-      source: raw.source || ''
+      source: raw.source || '',
+      image: typeof raw.image === 'string' && IMAGE_RE.test(raw.image) ? raw.image : ''
     };
     r.search = [
       r.title, r.description, tags.join(' '),
@@ -290,6 +296,7 @@
       if (typeof site.favicon === 'string' && /^theme\/favicon\.(svg|png|ico|webp)(\?v=[0-9a-f]+)?$/.test(site.favicon)) {
         document.getElementById('favicon').href = site.favicon;
       }
+      state.site.thumbnails = site.thumbnails === true;
     } catch (e) { /* keep the defaults */ }
   }
 
@@ -341,12 +348,14 @@
   const accountLinksHtml = () =>
     `Signed in as ${esc(state.user.username)} · ${isAdmin() ? '<a href="#/admin">Admin</a> · ' : ''}<a href="#/password">Change password</a> · <button class="link-button" data-action="logout">Sign out</button>`;
 
-  // Import is offered on the home page to importers and admins. The footer (outside #app,
+  // Import is offered on the home page to importers and admins, as are the photo buttons on
+  // a recipe page. The footer (outside #app,
   // so it's on every page) links to the admin page for admins, and visitors just see a
   // small sign-in link there. The server checks roles too.
   function drawAccount() {
     const head = document.getElementById('account-head');
     if (head) head.innerHTML = canImport() ? '<a class="button" href="#/import">Import recipe</a>' : '';
+    drawPhotoTools();
     foot.innerHTML = !state.userKnown ? ''
       : state.user ? accountLinksHtml()
       : '<a href="#/import">Sign in</a>';
@@ -372,9 +381,18 @@
       (r) => (!state.tag || r.tags.includes(state.tag)) && words.every((w) => r.search.includes(w))
     );
 
+    // Photos beside each row, when switched on in the admin page. Rows without one keep an
+    // empty square so the titles line up.
+    const thumbs = state.site.thumbnails;
+    list.classList.toggle('with-thumbs', thumbs);
+    const thumb = (r) => !thumbs ? ''
+      : r.image ? `<img class="photo thumb" src="${esc(r.image)}" alt="" loading="lazy" decoding="async">`
+      : '<span class="thumb"></span>';
+
     list.innerHTML = shown.map((r) => `
       <li>
         <a class="row" href="#/r/${encodeURIComponent(r.slug)}">
+          ${thumb(r)}
           <span class="row-title">${esc(r.title)}</span>
           ${r.description ? `<span class="row-desc">${esc(r.description)}</span>` : ''}
           <span class="row-meta"><span>Serves ${esc(r.servings)}</span>${r.time ? `<span>${esc(r.time)}</span>` : ''}</span>
@@ -421,9 +439,11 @@
       <article class="recipe">
         <a class="back" href="#/">All recipes</a>
         <header class="recipe-head">
+          <div id="photo"></div>
           <h1>${esc(r.title)}</h1>
           ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ''}
           <p class="facts"><span>Written for ${esc(r.servings)} servings</span>${r.time ? `<span>${esc(r.time)} total</span>` : ''}</p>
+          <div id="photo-tools"></div>
         </header>
 
         <div class="controls" role="group" aria-label="Recipe controls">
@@ -468,6 +488,9 @@
         ${source}
       </article>`;
 
+    if (state.photo.msg && state.photo.msg.slug !== r.slug) state.photo.msg = null;
+    drawPhoto();
+    drawPhotoTools();
     drawIngredients();
     drawControls();
   }
@@ -649,6 +672,125 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.wakeWanted && state.current) setWake(true);
   });
+
+  /* ---------- recipe photos ---------- */
+
+  // Every photo is redrawn here before it's uploaded: scaled down, and saved as a fresh
+  // JPEG, which leaves the camera's metadata (including where it was taken) behind.
+  const PHOTO_EDGE = 1600;
+
+  async function decodeImage(blob) {
+    try {
+      return await createImageBitmap(blob);
+    } catch (e) {
+      // Some browsers only decode certain formats (such as HEIC in Safari) through <img>
+      const url = URL.createObjectURL(blob);
+      try {
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        return img;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+  }
+
+  async function preparePhoto(blob) {
+    let src;
+    try {
+      src = await decodeImage(blob);
+    } catch (e) {
+      throw new Error("That photo couldn't be read. Try a JPEG, PNG or WebP image.");
+    }
+    const w = src.naturalWidth || src.width;
+    const h = src.naturalHeight || src.height;
+    const scale = Math.min(1, PHOTO_EDGE / Math.max(w, h));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; // transparent PNGs would otherwise turn black
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    if (src.close) src.close();
+    const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    if (!out) throw new Error("That photo couldn't be prepared. Try a smaller one.");
+    return out;
+  }
+
+  function base64Blob(data, type) {
+    const bytes = atob(data);
+    const buf = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
+    return new Blob([buf], { type });
+  }
+
+  function uploadPhoto(slug, blob) {
+    const form = new FormData();
+    form.append('slug', slug);
+    form.append('file', blob, slug + '.jpg');
+    return api('recipes/photo', { method: 'POST', form });
+  }
+
+  // The recipe objects are shared by the list and the recipe page, so one update covers both
+  function setRecipeImage(slug, image) {
+    const r = state.recipes.find((x) => x.slug === slug);
+    if (r) r.image = image;
+    if (state.current && state.current.slug === slug) drawPhoto();
+  }
+
+  function drawPhoto() {
+    const box = document.getElementById('photo');
+    const r = state.current;
+    if (!box || !r) return;
+    box.innerHTML = r.image ? `<img class="photo hero" src="${esc(r.image)}" alt="${esc(r.title)}" decoding="async">` : '';
+  }
+
+  // Importers and admins can add, change or remove the photo of a recipe that's open
+  function drawPhotoTools() {
+    const box = document.getElementById('photo-tools');
+    const r = state.current;
+    if (!box || !r) return;
+    const p = state.photo;
+    const msg = p.busy ? '<p class="working">Saving the photo…</p>'
+      : p.msg && p.msg.slug === r.slug ? `<p class="${p.msg.ok ? 'form-ok' : 'form-error'}">${esc(p.msg.text)}</p>` : '';
+    const dis = p.busy ? ' disabled' : '';
+    box.innerHTML = (canImport() ? `
+      <div class="photo-tools">
+        <button class="button secondary" data-action="pick-file" data-for="photo-file"${dis}>${r.image ? 'Change photo' : 'Add photo'}</button>
+        ${r.image ? `<button class="button secondary" data-action="photo-remove"${dis}>Remove photo</button>` : ''}
+        <input id="photo-file" type="file" accept="image/*" data-action="photo-file" hidden>
+      </div>` : '') + (msg ? `<div class="photo-msg" aria-live="polite">${msg}</div>` : '');
+  }
+
+  // Runs a photo change for the open recipe; the page isn't redrawn, so timers keep going
+  async function photoRequest(fn) {
+    const r = state.current;
+    if (!r || state.photo.busy) return;
+    const slug = r.slug;
+    state.photo = { busy: true, msg: null };
+    drawPhotoTools();
+    try {
+      setRecipeImage(slug, (await fn(slug)).image || '');
+    } catch (e) {
+      if (e.status === 401) {
+        state.user = null;
+        drawAccount();
+      }
+      state.photo.msg = { slug, text: e.status === 401 ? 'Your session ended. Sign in again to change the photo.' : e.message };
+    }
+    state.photo.busy = false;
+    drawPhotoTools();
+  }
+
+  function changePhoto(file) {
+    if (file) photoRequest(async (slug) => uploadPhoto(slug, await preparePhoto(file)));
+  }
+
+  function removePhoto() {
+    if (confirm('Remove the photo from this recipe?')) photoRequest((slug) => api('recipes/photo/delete', { method: 'POST', json: { slug } }));
+  }
 
   /* ---------- sign-in & import ---------- */
 
@@ -871,14 +1013,70 @@
         text: JSON.stringify(data.recipe, null, 2),
         saveMsg: '',
         conflict: false,
-        saving: false
+        saving: false,
+        photo: null,
+        photoBusy: false,
+        photoMsg: ''
       };
+      // The photo the web page publishes, offered for review like the rest
+      if (data.photo) setDraftPhoto(base64Blob(data.photo.data, data.photo.mediaType));
     } catch (e) {
       if (e.status === 401) state.user = null;
       state.imp.error = e.message;
     }
     state.imp.busy = false;
     if (location.hash === '#/import') showImport();
+  }
+
+  function clearImport() {
+    const d = state.imp.draft;
+    if (d && d.photo) URL.revokeObjectURL(d.photo.url);
+    state.imp = { busy: false, error: '', draft: null };
+  }
+
+  async function setDraftPhoto(blob) {
+    const d = state.imp.draft;
+    if (!d || !blob) return;
+    d.photoBusy = true;
+    d.photoMsg = '';
+    drawDraftPhoto();
+    try {
+      const out = await preparePhoto(blob);
+      if (state.imp.draft !== d) return; // started over meanwhile
+      if (d.photo) URL.revokeObjectURL(d.photo.url);
+      d.photo = { blob: out, url: URL.createObjectURL(out) };
+    } catch (e) {
+      d.photoMsg = e.message;
+    }
+    d.photoBusy = false;
+    drawDraftPhoto();
+  }
+
+  function removeDraftPhoto() {
+    const d = state.imp.draft;
+    if (!d || !d.photo) return;
+    URL.revokeObjectURL(d.photo.url);
+    d.photo = null;
+    drawDraftPhoto();
+  }
+
+  function draftPhotoHtml(d) {
+    const dis = d.photoBusy || d.saving ? ' disabled' : '';
+    return `
+      ${d.photo ? `<img class="photo draft" src="${esc(d.photo.url)}" alt="The photo that will be saved with the recipe">`
+        : '<p class="hint">Optional. A photo of the finished dish, shown at the top of the recipe.</p>'}
+      <div class="actions">
+        <button class="button secondary" data-action="pick-file" data-for="imp-photo-file"${dis}>${d.photo ? 'Choose another photo' : 'Choose photo'}</button>
+        ${d.photo ? `<button class="button secondary" data-action="imp-photo-remove"${dis}>Remove photo</button>` : ''}
+        <input id="imp-photo-file" type="file" accept="image/*" data-action="imp-photo-file" hidden>
+      </div>
+      ${d.photoBusy ? '<p class="working">Preparing the photo…</p>' : d.photoMsg ? `<p class="form-error">${esc(d.photoMsg)}</p>` : ''}`;
+  }
+
+  function drawDraftPhoto() {
+    const box = document.getElementById('imp-photo');
+    const d = state.imp.draft;
+    if (box && d) box.innerHTML = draftPhotoHtml(d);
   }
 
   function importFile(file) {
@@ -914,6 +1112,8 @@
         </section>
       </div>
       <div class="save-bar">
+        <h2 class="field-label" id="ph-h">Photo</h2>
+        <div id="imp-photo" class="imp-photo" role="group" aria-labelledby="ph-h">${draftPhotoHtml(d)}</div>
         <label for="imp-slug">File name</label>
         <div class="slug-field"><input id="imp-slug" value="${esc(d.slug)}" autocapitalize="none" spellcheck="false"><span>.json</span></div>
         <p class="hint">Lowercase letters, numbers and hyphens. This becomes the recipe's address, so pick it once.</p>
@@ -996,11 +1196,26 @@
       return;
     }
 
+    if (d.photoBusy) {
+      d.saveMsg = 'Wait for the photo to finish preparing.';
+      drawSaveStatus();
+      return;
+    }
+
     d.saving = true;
     drawSaveStatus();
     try {
       await api('recipes', { method: 'POST', json: { slug, recipe, overwrite: overwrite === true } });
-      state.imp = { busy: false, error: '', draft: null };
+      // The recipe is saved now, whatever happens to the photo
+      if (d.photo) {
+        try {
+          await uploadPhoto(slug, d.photo.blob);
+          state.photo.msg = null;
+        } catch (e) {
+          state.photo.msg = { slug, text: `The recipe was saved, but the photo couldn't be added: ${e.message} Try again from here.` };
+        }
+      }
+      clearImport();
       await loadRecipes();
       location.hash = '#/r/' + encodeURIComponent(slug);
       return;
@@ -1046,7 +1261,7 @@
   async function logout() {
     try { await api('logout', { method: 'POST' }); } catch (e) { /* signed out locally anyway */ }
     state.user = null;
-    state.imp = { busy: false, error: '', draft: null };
+    clearImport();
     state.admin = null;
     if (ACCOUNT_PAGES.includes(location.hash)) location.hash = '#/';
     else route(); // signed out from a page anyone can see: no hash change, so redraw directly
@@ -1193,6 +1408,8 @@
           <input id="ad-radius" type="range" name="radius" min="${o.radius.min}" max="${o.radius.max}" step="1" value="${look.radius}">
           <output id="ad-radius-out" for="ad-radius">${look.radius}px</output>
         </div>
+        <label class="check"><input type="checkbox" name="thumbnails"${look.thumbnails ? ' checked' : ''}> Show photos on the home page</label>
+        <p class="hint">A small photo beside each recipe in the list. Recipes without a photo get an empty square.</p>
         <div class="actions">
           <button class="button" type="submit">Save appearance</button>
           <button class="button secondary" type="button" data-action="admin-look-undo">Undo changes</button>
@@ -1223,6 +1440,7 @@
     }
     look.fonts = { heading: f.heading.value, body: f.body.value };
     look.radius = Number(f.radius.value);
+    look.thumbnails = f.thumbnails.checked;
     return look;
   }
 
@@ -1609,11 +1827,18 @@
       case 'step': toggleStep(el); break;
       case 'timer-start': startTimer(el.dataset.i); break;
       case 'timer-stop': stopTimer(el.dataset.i); break;
+      case 'pick-file': {
+        const input = document.getElementById(el.dataset.for);
+        if (input) input.click();
+        break;
+      }
+      case 'photo-remove': removePhoto(); break;
+      case 'imp-photo-remove': removeDraftPhoto(); break;
       case 'imp-preview': drawPreview(); break;
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
       case 'imp-reset':
-        state.imp = { busy: false, error: '', draft: null };
+        clearImport();
         drawImport();
         break;
       case 'admin-look-undo':
@@ -1699,8 +1924,26 @@
       setWake(el.checked);
     } else if (el.dataset.action === 'user-role') {
       changeRole(el);
+    } else if (el.dataset.action === 'photo-file') {
+      changePhoto(el.files[0]);
+    } else if (el.dataset.action === 'imp-photo-file') {
+      setDraftPhoto(el.files[0]);
     }
   });
+
+  // A photo missing from the server is left out rather than shown broken. Load errors
+  // don't bubble, so this listens in the capture phase.
+  app.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.classList.contains('photo')) return;
+    if (img.classList.contains('thumb')) {
+      const blank = document.createElement('span');
+      blank.className = 'thumb';
+      img.replaceWith(blank);
+    } else {
+      img.remove();
+    }
+  }, true);
 
   // API keys and passwords typed on the admin page can't be copied or dragged back out
   for (const type of ['copy', 'cut', 'dragstart']) {

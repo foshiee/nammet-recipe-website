@@ -2,10 +2,11 @@
 
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 
-- **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check and edit it, and save it straight into the recipes folder. It appears on the site immediately.
-- **Admin** (admins only), also at `#/admin`: change the site name and icon, pick a colour theme (each has light and dark colours) and fine-tune its colours, and choose the fonts and corner rounding; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
+- **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check and edit it, add a photo of the finished dish, and save it straight into the recipes folder. It appears on the site immediately. A web page's own recipe photo is offered automatically.
+- **Add photo / Change photo / Remove photo** (importers and admins), under the title of any recipe.
+- **Admin** (admins only), also at `#/admin`: change the site name and icon, pick a colour theme (each has light and dark colours) and fine-tune its colours, choose the fonts and corner rounding, and show photos on the home page; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
 
-There are two roles. **Admins** can do everything. **Importers** can only import recipes. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
+There are two roles. **Admins** can do everything. **Importers** can only import recipes and change their photos. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
 
 A password set for someone else, whether on the admin page or with the command-line tool, is temporary. At their first sign-in they're asked to choose their own, and they can't do anything else until they have. Anyone signed in can also change their password at any time with **Change password** next to **Sign out**. There's no "forgot password" link: that would need some other way to prove who you are, such as email, so a forgotten password is reset by an admin, who hands over a new temporary one.
 
@@ -18,6 +19,7 @@ browser ──HTTPS──> Traefik ──HTTP──> nginx :80 ──> /var/www/
                                           └─ /api/ ──> nomnoms-api :3000   (Node, 127.0.0.1 only)
                                                           ├─ reads/writes /var/lib/nomnoms/users.json, settings.json
                                                           ├─ writes /var/www/nomnoms/recipes/<name>.json
+                                                          ├─ writes /var/www/nomnoms/photos/<name>-<hash>.jpg
                                                           ├─ writes /var/www/nomnoms/theme/ (theme.css, site.json, favicon)
                                                           └─ calls  api.anthropic.com (only when needed)
 ```
@@ -139,11 +141,11 @@ Recipe files go in `/var/www/nomnoms/recipes/`; see [recipe-format.md](recipe-fo
 ```sh
 sudo useradd --system --home-dir /var/lib/nomnoms --shell /sbin/nologin nomnoms
 sudo install -d -m 0700 -o nomnoms -g nomnoms /var/lib/nomnoms
-sudo install -d -m 0755 -o nomnoms -g nomnoms /var/www/nomnoms/theme
-sudo restorecon -Rv /var/www/nomnoms/theme
+sudo install -d -m 0755 -o nomnoms -g nomnoms /var/www/nomnoms/theme /var/www/nomnoms/photos
+sudo restorecon -Rv /var/www/nomnoms/theme /var/www/nomnoms/photos
 ```
 
-`/var/lib/nomnoms` holds the users file and the admin page's settings, including the API key if you save one there. `/var/www/nomnoms/theme` is public: the service writes the site's look into it (`theme.css`, `site.json` and the icon) each time an admin saves, and once when it starts.
+`/var/lib/nomnoms` holds the users file and the admin page's settings, including the API key if you save one there. `/var/www/nomnoms/theme` is public: the service writes the site's look into it (`theme.css`, `site.json` and the icon) each time an admin saves, and once when it starts. `/var/www/nomnoms/photos` is public too and holds the recipe photos added on the site.
 
 ### 8. Install the service code
 
@@ -171,6 +173,13 @@ The folder is owned by root, so any other account (for example `recipeusr`, used
 sudo setfacl -m u:recipeusr:rwx /var/www/nomnoms/recipes
 sudo setfacl -d -m u:recipeusr:rwx -m u:nomnoms:rwx /var/www/nomnoms/recipes
 getfacl /var/www/nomnoms/recipes     # check both users are listed
+```
+
+To upload photos by hand as well, give the same account write access to the photos folder:
+
+```sh
+sudo setfacl -m u:recipeusr:rwx /var/www/nomnoms/photos
+sudo setfacl -d -m u:recipeusr:rwx -m u:nomnoms:rwx /var/www/nomnoms/photos
 ```
 
 If uploads still fail:
@@ -284,13 +293,15 @@ What the service does to protect itself:
 - Sessions use random tokens in `HttpOnly; Secure; SameSite=Strict` cookies, and every POST must carry a custom header, which blocks cross-site requests.
 - Web-address imports refuse private, loopback and cloud-metadata addresses, including through redirects.
 - Uploads are limited to 20 MB, and file types are identified from their contents, not their names.
+- Photos are scaled down and re-saved as JPEG in the browser before they're uploaded, which drops the camera's metadata, such as where the photo was taken. The server then accepts only JPEG files under 5 MB, removes any metadata again, and writes them only to the photos folder under a name made from the recipe and the file's contents. It only deletes photos it named itself. A web page's photo is downloaded with the same protections as the page.
+- A recipe's `image` can only name a file in the site's own photos folder, so pages never load anything from other sites.
 - Recipe files are written atomically and never overwrite an existing recipe unless you confirm.
 - Admin routes need the admin role, and import routes need the importer or admin role. Role changes and removals apply to open sessions straight away, and a password reset signs that user out everywhere.
 - Until someone with a temporary password has chosen their own, the server refuses every import and admin request from them. Changing a password needs the current one, counts wrong attempts towards the sign-in limit, and signs out the user's other sessions.
 - There's no self-service password reset, so there's nothing to abuse by guessing a user name. Only an admin, or someone with shell access to the VM, can reset a password.
 - An API key saved on the admin page is stored in `/var/lib/nomnoms/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
 - Only checked values reach the public `theme/` folder: colours must be hex codes, and the main text, link and button colours must contrast at least 3:1 with what's behind them (the admin page warns below 4.5:1); fonts come from a fixed list, corner rounding must be a whole number of pixels from 0 to 24, and icons must be PNG, ICO or WebP (SVG uploads are refused).
-- systemd limits the service to writing in the recipes folder, the theme folder and `/var/lib/nomnoms`.
+- systemd limits the service to writing in the recipes, photos and theme folders and `/var/lib/nomnoms`.
 
 ## Day to day
 
@@ -298,7 +309,7 @@ What the service does to protect itself:
 - **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer] [--permanent]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). The password is temporary unless you pass `--permanent`, for example when resetting your own. Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat the `install` line in setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users, settings, theme, `api.env` and the recipes all live outside the clone, so updates don't touch them.
+- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat the `install` line in setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users, settings, theme, `api.env`, the recipes and their photos all live outside the clone, so updates don't touch them.
 
 ## Cost of Claude imports
 
@@ -316,9 +327,10 @@ npm install
 USERS_FILE=./dev-users.json node tools/add-user.js tester --role admin --permanent
 mkdir -p ../../var/www/nomnoms/theme
 USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nomnoms/theme \
-  RECIPES_DIR=../../var/www/nomnoms/recipes DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
+  RECIPES_DIR=../../var/www/nomnoms/recipes PHOTOS_DIR=../../var/www/nomnoms/photos \
+  DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
 ```
 
-Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nomnoms/recipes/` folder, so delete any test recipes before committing. `dev-users.json`, `dev-settings.json` and the generated `var/www/nomnoms/theme/` folder are gitignored.
+Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nomnoms/recipes/` folder, so delete any test recipes before committing. `dev-users.json`, `dev-settings.json`, the generated `var/www/nomnoms/theme/` folder and photos other than the example recipe's are gitignored.
 
 Tests for the parts that don't need Claude: `npm test`.

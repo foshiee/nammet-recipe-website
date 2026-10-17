@@ -98,6 +98,7 @@ test('saving appearance writes the public theme files', async () => {
   const site = JSON.parse(await fs.readFile(path.join(process.env.THEME_DIR, 'site.json'), 'utf8'));
   assert.equal(site.name, 'Our Kitchen');
   assert.match(site.favicon, /^theme\/favicon\.svg\?v=[0-9a-f]+$/);
+  assert.equal(site.thumbnails, false);
   assert.match(await fs.readFile(path.join(process.env.THEME_DIR, 'theme.css'), 'utf8'), /--radius: 14px;/);
   assert.match(await fs.readFile(path.join(process.env.THEME_DIR, 'favicon.svg'), 'utf8'), /🥕/);
 
@@ -109,6 +110,11 @@ test('saving appearance writes the public theme files', async () => {
 
   const saved = JSON.parse(await fs.readFile(process.env.SETTINGS_FILE, 'utf8'));
   assert.equal(saved.appearance.siteName, 'Our Kitchen');
+
+  // Home-page photos: off unless switched on, and only a real true turns them on
+  await settings.saveAppearance({ ...settings.appearance(), thumbnails: true });
+  assert.equal(JSON.parse(await fs.readFile(path.join(process.env.THEME_DIR, 'site.json'), 'utf8')).thumbnails, true);
+  assert.equal(settings.validateAppearance(appearance({ thumbnails: 'yes' })).thumbnails, false);
 });
 
 test('a corner style saved before the slider still loads', async () => {
