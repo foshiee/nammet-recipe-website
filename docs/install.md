@@ -41,7 +41,7 @@ Not supported: HEIC photos (export as JPEG or take a screenshot), Word and other
 
 - A container or VM running a Linux distro of your choice. The guide is written for Rocky Linux 10. 1 vCPU, 2 GB of RAM and a 20 GB disk are plenty.
 - A reverse proxy/router that ends HTTPS for the site's host name and forwards to port 80 on the VM. The example uses Traefik. Setting up Traefik isn't covered here; the [security checklist](#security-checklist-traefik-in-front) lists what nginx needs to know about it.
-- Outbound internet access from the VM: ports 80 and 443 for package installs, `api.anthropic.com`, `registry.npmjs.org` and any recipe site you import from, plus port 22 to `github.com` for fetching the code. The service connects directly; it doesn't support an outbound HTTP proxy.
+- Outbound internet access from the VM: ports 80 and 443 for package installs, `github.com`, `api.anthropic.com`, `registry.npmjs.org` and any recipe site you import from. The service connects directly; it doesn't support an outbound HTTP proxy.
 - An Anthropic API key for PDF, photo and text imports, from [console.anthropic.com](https://console.anthropic.com). Without one, `.json` files and most recipe websites still import.
 
 ## Preparing the VM
@@ -86,41 +86,28 @@ curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://www.bbcgoodfood.c
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://registry.npmjs.org/
 ```
 
-Any number counts as success, including `404`; it only proves the VM can reach the site. GitHub access over SSH is checked in step 4.
+Any number counts as success, including `404`; it only proves the VM can reach the site. GitHub access is checked in step 4.
 
 ## Installing the site and import service
 
-The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so that root needs no GitHub access and the clone stays yours; only the commands that install files use `sudo`.
+The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so the clone stays yours; only the commands that install files use `sudo`.
 
-### 4. Give the VM read access to the repo
+### 4. Check access to the repo
 
-A deploy key is an SSH key that can read this one repo and nothing else on your GitHub account. Create it on the VM:
-
-```sh
-ssh-keygen -t ed25519 -f ~/.ssh/nomnoms_deploy -N "" -C "nomnoms-vm"
-cat ~/.ssh/nomnoms_deploy.pub
-```
-
-On GitHub, open the repo and go to **Settings → Deploy keys → Add deploy key**. Paste the public key and leave **Allow write access** unticked. Then tell SSH to use the key for GitHub:
+The repo is public, so the VM reads it over HTTPS with no key or GitHub account. Check that it can reach it:
 
 ```sh
-cat >> ~/.ssh/config <<'EOF'
-Host github.com
-  IdentityFile ~/.ssh/nomnoms_deploy
-  IdentitiesOnly yes
-EOF
-chmod 600 ~/.ssh/config
-ssh -T git@github.com     # "Hi foshiee/nomnoms-recipe-website! You've successfully authenticated..."
+git ls-remote https://github.com/foshiee/nomnoms-recipe-website.git HEAD     # prints a commit hash and HEAD
 ```
 
-The first connection asks you to confirm GitHub's host key. Compare the fingerprint with the ones listed on [GitHub's SSH key fingerprints](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints) page before typing `yes`.
+An error or a hang means outbound HTTPS to `github.com` is blocked. The VM only ever pulls, so it needs no write access; changes are pushed from your own machine.
 
 ### 5. Clone the repo
 
 Clone it into your home directory. Never clone it into `/var/www`, where nginx would serve `.git/` and everything else in the repo.
 
 ```sh
-git clone git@github.com:foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
+git clone https://github.com/foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
 cd ~/nomnoms-recipe-website
 ```
 
