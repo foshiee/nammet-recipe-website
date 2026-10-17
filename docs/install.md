@@ -136,26 +136,26 @@ sudo setfacl -m u:nomnoms:rwx /var/www/nomnoms/recipes
 
 #### Optional: let an SFTP user upload recipes by hand
 
-The folder is owned by root, so any other account (for example `recipeusr`, used with FileZilla) can read it but not upload to it. Give that account write access the same way. The second command sets default ACLs, so files created by either `recipeusr` or `nomnoms` stay writable by both. Without it, the import service may be unable to overwrite a recipe that was uploaded by hand.
+The folder is owned by root, so any other account (for example `loginuser`, used with scp or FileZilla) can read it but not upload to it. Give that account write access the same way. The second command sets default ACLs, so files created by either `loginuser` or `nomnoms` stay writable by both. Without it, the import service may be unable to overwrite a recipe that was uploaded by hand.
 
 ```sh
-sudo setfacl -m u:recipeusr:rwx /var/www/nomnoms/recipes
-sudo setfacl -d -m u:recipeusr:rwx -m u:nomnoms:rwx /var/www/nomnoms/recipes
+sudo setfacl -m u:loginuser:rwx /var/www/nomnoms/recipes
+sudo setfacl -d -m u:loginuser:rwx -m u:nomnoms:rwx /var/www/nomnoms/recipes
 getfacl /var/www/nomnoms/recipes     # check both users are listed
 ```
 
 To upload photos by hand as well, give the same account write access to the photos folder:
 
 ```sh
-sudo setfacl -m u:recipeusr:rwx /var/www/nomnoms/photos
-sudo setfacl -d -m u:recipeusr:rwx -m u:nomnoms:rwx /var/www/nomnoms/photos
+sudo setfacl -m u:loginuser:rwx /var/www/nomnoms/photos
+sudo setfacl -d -m u:loginuser:rwx -m u:nomnoms:rwx /var/www/nomnoms/photos
 ```
 
 If uploads still fail:
 
 - **SELinux:** files uploaded over SFTP inherit the folder's label, so nginx can read them. If one isn't served, run `sudo restorecon -Rv /var/www/nomnoms`.
-- **Chroot:** if `recipeusr` is chrooted or limited to `internal-sftp` in `sshd_config`, the chroot directory must be root-owned and not writable, so uploads must go into a writable subfolder.
-- **Permissions:** `recipeusr` needs execute (`x`) on every parent folder. `/var/www/nomnoms` is `0755`, so this normally works.
+- **Chroot:** if `loginuser` is chrooted or limited to `internal-sftp` in `sshd_config`, the chroot directory must be root-owned and not writable, so uploads must go into a writable subfolder.
+- **Permissions:** `loginuser` needs execute (`x`) on every parent folder. `/var/www/nomnoms` is `0755`, so this normally works.
 
 ### 8. Configuration
 
