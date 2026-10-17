@@ -27,7 +27,7 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 ## How it fits together
 
 ```
-browser ──> Traefik (HTTPS) ──> nginx ──> /var/www/nomnoms      static site and recipe JSON
+browser ──> Traefik [or reverse proxy of your choice] (HTTPS) ──> nginx ──> /var/www/nomnoms      static site and recipe JSON
                                        └─> /api/ ──> Node service on 127.0.0.1:3000
 ```
 
