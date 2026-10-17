@@ -39,7 +39,7 @@ Not supported: HEIC photos (export as JPEG or take a screenshot), Word and other
 
 ## Requirements
 
-- A container or VM running a Linux distro of your choice. The guide is written for Rocky Linux 10. 1 vCPU, 2 GB of RAM and a 20 GB disk are plenty.
+- A container or VM running a Linux distro of your choice. The guide is written for Rocky Linux 10. 1 vCPU, 2 GB of RAM and a 20 GB disk are plenty. Depending on the distro you choose, some parts of the setup may differ from this guide. One example of this could be nginx's `sites-available` and `sites-enabled` folder structure instead of `conf.d`.
 - A reverse proxy/router that ends HTTPS for the site's host name and forwards to port 80 on the VM. The example uses Traefik. Setting up Traefik isn't covered here; the [security checklist](#security-checklist-traefik-in-front) lists what nginx needs to know about it.
 - Outbound internet access from the VM: ports 80 and 443 for package installs, `github.com`, `api.anthropic.com`, `registry.npmjs.org` and any recipe site you import from. The service connects directly; it doesn't support an outbound HTTP proxy.
 - An Anthropic API key for PDF, photo and text imports, from [console.anthropic.com](https://console.anthropic.com). Without one, `.json` files and most recipe websites still import.
