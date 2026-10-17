@@ -1,4 +1,4 @@
-# Server setup and recipe import
+# Installing and running the site
 
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 

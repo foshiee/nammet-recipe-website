@@ -21,13 +21,13 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `etc/systemd/system/nomnoms-api.service` | same | systemd unit for the service, which can write only to the recipes and photos folders, `theme/` and `/var/lib/nomnoms`. |
 | `etc/nomnoms/api.env.example` | `/etc/nomnoms/api.env` | Service settings, including `ANTHROPIC_API_KEY` (an admin-page key overrides it). The real file is never committed. |
 | `docs/recipe-format.md` | n/a | Authoritative recipe JSON spec. |
-| `docs/import-setup.md` | n/a | Server setup from a fresh Rocky Linux 10 VM, running the import service, and the security checklist. |
+| `docs/install.md` | n/a | Server setup from a fresh Rocky Linux 10 VM, running the import service, and the security checklist. |
 | `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
 
 ## Running and testing
 
-The front end has nothing to build. The easiest local setup is the API's dev mode, which serves `var/www/nomnoms/` and emulates nginx's JSON listing (commands in `docs/import-setup.md`, "Trying it locally"). A plain `python -m http.server` doesn't return a JSON listing for `recipes/`, so the app reports "Couldn't load the recipe list" unless an `index.json` exists. Validate a recipe file with `python3 -m json.tool file.json`.
+The front end has nothing to build. The easiest local setup is the API's dev mode, which serves `var/www/nomnoms/` and emulates nginx's JSON listing (commands in `docs/install.md`, "Trying it locally"). A plain `python -m http.server` doesn't return a JSON listing for `recipes/`, so the app reports "Couldn't load the recipe list" unless an `index.json` exists. Validate a recipe file with `python3 -m json.tool file.json`.
 
 Backend tests: `cd opt/nomnoms-api && npm test` (Node's built-in runner, no network or API key needed). `test/admin.test.js` and `test/photos.test.js` set `SETTINGS_FILE`/`THEME_DIR`/`USERS_FILE` (or `RECIPES_DIR`/`PHOTOS_DIR`) to a temp folder before importing, because `config.js` reads the environment once.
 

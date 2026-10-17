@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Login and recipe import service for the nomnoms recipe site",
+  "license": "MIT",
   "type": "module",
   "main": "server.js",
   "engines": {
