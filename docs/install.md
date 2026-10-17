@@ -84,27 +84,18 @@ Each line should print an HTTP status code. A timeout or `000` means outbound ac
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://api.anthropic.com/
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://www.bbcgoodfood.com/
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://registry.npmjs.org/
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://github.com/
 ```
 
-Any number counts as success, including `404`; it only proves the VM can reach the site. GitHub access is checked in step 4.
+Any number counts as success, including `404`; it only proves the VM can reach the site.
 
 ## Installing the site and import service
 
 The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so the clone stays yours; only the commands that install files use `sudo`.
 
-### 4. Check access to the repo
+### 4. Clone the repo
 
-The repo is public, so the VM reads it over HTTPS with no key or GitHub account. Check that it can reach it:
-
-```sh
-git ls-remote https://github.com/foshiee/nomnoms-recipe-website.git HEAD     # prints a commit hash and HEAD
-```
-
-An error or a hang means outbound HTTPS to `github.com` is blocked. The VM only ever pulls, so it needs no write access; changes are pushed from your own machine.
-
-### 5. Clone the repo
-
-Clone it into your home directory. Never clone it into `/var/www`, where nginx would serve `.git/` and everything else in the repo.
+The repo is public, so cloning and pulling over HTTPS need no key or GitHub account. Clone it into your home directory. Never clone it into `/var/www`, where nginx would serve `.git/` and everything else in the repo.
 
 ```sh
 git clone https://github.com/foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
@@ -113,7 +104,7 @@ cd ~/nomnoms-recipe-website
 
 The steps below run from this folder. The repo's `.gitattributes` makes every checkout use LF line endings, which the systemd unit and `api.env` need.
 
-### 6. Install the website
+### 5. Install the website
 
 ```sh
 sudo install -d -m 0755 /var/www/nomnoms /var/www/nomnoms/recipes
@@ -123,7 +114,7 @@ sudo restorecon -Rv /var/www/nomnoms   # SELinux labels
 
 Recipe files go in `/var/www/nomnoms/recipes/`; see [recipe-format.md](recipe-format.md).
 
-### 7. Create the service account and its folders
+### 6. Create the service account and its folders
 
 ```sh
 sudo useradd --system --home-dir /var/lib/nomnoms --shell /sbin/nologin nomnoms
@@ -134,7 +125,7 @@ sudo restorecon -Rv /var/www/nomnoms/theme /var/www/nomnoms/photos
 
 `/var/lib/nomnoms` holds the users file and the admin page's settings, including the API key if you save one there. `/var/www/nomnoms/theme` is public: the service writes the site's look into it (`theme.css`, `site.json` and the icon) each time an admin saves, and once when it starts. `/var/www/nomnoms/photos` is public too and holds the recipe photos added on the site.
 
-### 8. Install the service code
+### 7. Install the service code
 
 ```sh
 sudo mkdir -p /opt/nomnoms-api
@@ -144,7 +135,7 @@ cd /opt/nomnoms-api && sudo npm ci --omit=dev && cd -
 
 `npm ci` installs the two dependencies (`@anthropic-ai/sdk` and `busboy`) at the exact versions in `package-lock.json`.
 
-### 9. Let the service write recipes
+### 8. Let the service write recipes
 
 This adds write access for `nomnoms` without changing who owns the folder, so you can still copy files in by hand:
 
@@ -175,7 +166,7 @@ If uploads still fail:
 - **Chroot:** if `recipeusr` is chrooted or limited to `internal-sftp` in `sshd_config`, the chroot directory must be root-owned and not writable, so uploads must go into a writable subfolder.
 - **Permissions:** `recipeusr` needs execute (`x`) on every parent folder. `/var/www/nomnoms` is `0755`, so this normally works.
 
-### 10. Configuration
+### 9. Configuration
 
 ```sh
 sudo install -d -m 0750 -o root -g nomnoms /etc/nomnoms
@@ -185,7 +176,7 @@ sudo nano /etc/nomnoms/api.env     # paste your key after ANTHROPIC_API_KEY=
 
 No quotes or spaces around the key. You can also leave it empty and add the key on the admin page once the site is running, which needs no restart. A key saved on the admin page takes priority over this file. Without any key, everything except PDF, photo and text imports still works.
 
-### 11. Create your login
+### 10. Create your login
 
 This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory. The password is temporary, so you'll choose your own the first time you sign in. Add `--permanent` to skip that.
 
@@ -195,7 +186,7 @@ sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js yo
 cd -
 ```
 
-### 12. Start the service
+### 11. Start the service
 
 ```sh
 sudo install -m 0644 etc/systemd/system/nomnoms-api.service /etc/systemd/system/
@@ -207,7 +198,7 @@ curl -s http://127.0.0.1:3000/api/me         # {"user":null}
 
 The service listens only on `127.0.0.1`, so no firewall port needs opening for it.
 
-### 13. SELinux
+### 12. SELinux
 
 nginx needs permission to connect to the service:
 
@@ -215,7 +206,7 @@ nginx needs permission to connect to the service:
 sudo setsebool -P httpd_can_network_connect 1
 ```
 
-### 14. nginx
+### 13. nginx
 
 ```sh
 sudo install -m 0644 etc/nginx/nginx.conf /etc/nginx/nginx.conf
@@ -229,7 +220,7 @@ The main `nginx.conf` is the stock one with its sample server blocks commented o
 
 The address to use, and how to find it, is in the security checklist below.
 
-### 15. Check it end to end
+### 14. Check it end to end
 
 1. Open the site in a browser over HTTPS. There should be a small **Sign in** link at the bottom of the home page. If it isn't there, force-refresh the page (Ctrl+F5) to drop the cached `app.js`.
 2. Click it and sign in. You'll be asked to choose your own password (unless you used `--permanent`), then you should land on the import screen, and the home page should now show **Import recipe** at the top right.
@@ -238,7 +229,7 @@ The address to use, and how to find it, is in the security checklist below.
 5. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
 6. Watch it all in the log: `journalctl -u nomnoms-api -f`.
 
-If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux boolean from step 13, and `sudo tail /var/log/nginx/error.log`.
+If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux boolean from step 12, and `sudo tail /var/log/nginx/error.log`.
 
 ## Security checklist (Traefik in front)
 
@@ -296,7 +287,7 @@ What the service does to protect itself:
 - **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer] [--permanent]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). The password is temporary unless you pass `--permanent`, for example when resetting your own. Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat the `install` line in setup step 6 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users, settings, theme, `api.env`, the recipes and their photos all live outside the clone, so updates don't touch them.
+- **Updating:** in `~/nomnoms-recipe-website`, run `git pull --ff-only`. `git log --oneline ORIG_HEAD..` then lists what came in. Repeat the `install` line in setup step 5 for website changes. For service changes, run `sudo cp -r opt/nomnoms-api/. /opt/nomnoms-api/`, then `cd /opt/nomnoms-api && sudo npm ci --omit=dev`, then `sudo systemctl restart nomnoms-api`. Your users, settings, theme, `api.env`, the recipes and their photos all live outside the clone, so updates don't touch them.
 
 ## Cost of Claude imports
 
