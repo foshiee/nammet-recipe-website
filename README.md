@@ -1,4 +1,4 @@
-# nomnoms
+# Nomnoms Recipes Web Application
 
 A self-hosted recipe website for one household or a small group. Recipes are plain JSON files in a folder, the front end is a single HTML page with vanilla JavaScript and CSS, and nginx serves the lot. There is no database, no build step and no front-end dependencies.
 
