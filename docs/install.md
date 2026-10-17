@@ -189,13 +189,16 @@ curl -s http://127.0.0.1:3000/api/me         # {"user":null}
 
 The service listens only on `127.0.0.1`, so no firewall port needs opening for it.
 
-### 11. SELinux
+### 11. Let nginx connect to the service
 
-nginx needs permission to connect to the service:
+SELinux stops web servers from opening network connections by default, including to the service on `127.0.0.1:3000`. Without this setting the site still loads, but every `/api/` request fails, so the import page says *The import service isn't available on this server*. nginx's error log shows `connect() to 127.0.0.1:3000 failed (13: Permission denied)`.
 
 ```sh
 sudo setsebool -P httpd_can_network_connect 1
+getsebool httpd_can_network_connect     # httpd_can_network_connect --> on
 ```
+
+`-P` keeps the setting after a reboot. If your distro doesn't use SELinux, skip this step.
 
 ### 12. nginx
 
@@ -220,7 +223,7 @@ The address to use, and how to find it, is in the security checklist below.
 5. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
 6. Watch it all in the log: `journalctl -u nomnoms-api -f`.
 
-If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux boolean from step 11, and `sudo tail /var/log/nginx/error.log`.
+If the import page says *The import service isn't available on this server*, nginx can't reach the service. Check `systemctl status nomnoms-api`, the SELinux setting from step 11, and `sudo tail /var/log/nginx/error.log`.
 
 ## Security checklist (Traefik in front)
 
