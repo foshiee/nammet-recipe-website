@@ -112,7 +112,7 @@ nginx returns 403 to known AI crawlers and scraping libraries, and `robots.txt` 
 
 ## Support
 
-nomnoms is free, and you can use it however you like. If it's earned a place in your kitchen, you can [buy me a pint🍺 on Ko-fi](https://ko-fi.com/foshiee).
+Nomnoms Recipe Website is free, and you can use it however you like. If it's earned a place in your kitchen, you can [buy me a pint🍺 on Ko-fi](https://ko-fi.com/foshiee).
 
 ## License
 
