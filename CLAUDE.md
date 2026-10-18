@@ -20,8 +20,14 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `etc/nginx/nginx.conf` | `/etc/nginx/nginx.conf` | Stock RHEL-style main config; includes `conf.d/*.conf`. |
 | `etc/systemd/system/nomnoms-api.service` | same | systemd unit for the service, which can write only to the recipes and photos folders, `theme/` and `/var/lib/nomnoms`. |
 | `etc/nomnoms/api.env.example` | `/etc/nomnoms/api.env` | Service settings, including `ANTHROPIC_API_KEY` (an admin-page key overrides it). The real file is never committed. |
+| `install.sh` | n/a | Runs the install.md steps on a RHEL-family or Debian/Ubuntu host from the clone (re-execs itself with sudo); running it again updates in place. Never overwrites an existing `api.env`, recipes, photos, users or settings. Re-renders `nomnoms.conf` from the repo copy each run, keeping the `set_real_ip_from` addresses and Cloudflare include it reads from the installed file. |
+| `Dockerfile`, `.dockerignore` | n/a | One image (node:22-alpine + nginx) with the same paths as the VM. The service runs as `node`; `VOLUME`s are `recipes/`, `photos/` and `/var/lib/nomnoms`. |
+| `docker/` | `/usr/local/bin/` in the image | `entrypoint.sh` renders the nginx config (applying `REAL_IP_FROM`), chowns the volume folders and supervises node + nginx; `add-user` wraps `tools/add-user.js`; `smoke-test.sh <base-url>` is the end-to-end check used by CI (sign-in too with `SMOKE_USER`/`SMOKE_PASSWORD`). |
+| `docker-compose.yml` | n/a | Example compose file for the published image. |
+| `.github/workflows/docker.yml` | n/a | CI: shellcheck and `npm test`, builds and smoke-tests the image, runs `install.sh` twice on Ubuntu; a `v*` tag publishes the image to `ghcr.io/foshiee/nomnoms-recipe-website` (amd64 + arm64). |
 | `docs/recipe-format.md` | n/a | Authoritative recipe JSON spec. |
-| `docs/install.md` | n/a | Server setup from a fresh Rocky Linux 10 VM, running the import service, and the security checklist. |
+| `docs/install.md` | n/a | Server setup from a fresh Rocky Linux 10 VM (with `install.sh` or by hand), running the import service, and the security checklist. |
+| `docs/docker.md` | n/a | Running the Docker image: volumes, settings, `REAL_IP_FROM`, updating, releasing. |
 | `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
 | `docs/screenshots/` | n/a | WebP screenshots used by the README, in light and dark versions where the README swaps them by theme. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
@@ -75,4 +81,7 @@ Node 20+, ES modules, two dependencies (`@anthropic-ai/sdk`, `busboy`). Settings
 - Keep quantities out of step and note text; those strings are never scaled.
 - Colours live in CSS variables at the top of `style.css`, with a dark-mode override block. The same defaults are the first theme (`sea-glass`) in `THEMES` in `settings.js`; keep them in sync. A new themeable variable goes in `COLORS` and in every theme there. New themes must clear `CONTRAST.warn` for every pair in both modes (a test checks).
 - Unit aliases exist in both `app.js` (`ALIASES`) and `opt/nomnoms-api/import/ingredient.js` (`UNITS`). Keep them in sync.
+- The commented real-IP lines in `nginx-nomnoms.conf` (`# set_real_ip_from 192.0.2.10;`, `# real_ip_header X-Forwarded-For;`, `# real_ip_recursive on;`) and `# include /etc/nginx/cloudflare-ips.inc;` are anchors that `docker/entrypoint.sh` and `install.sh` match exactly to render the config. Change them in all three places together; both scripts fail loudly if an anchor is missing.
+- The Dockerfile's `ENV` mirrors the paths and defaults in `api.env.example`; keep them in sync.
+- A new file served from `var/www/nomnoms/` must be added to the `install` line in `install.sh`, the Dockerfile's `COPY` and step 6 of `docs/install.md`.
 - Docs describe a fresh, valid install of the current layout. Don't add upgrade or migration steps (old paths, renamed files, backing up previous configs); if a change affects an existing server, say so in the commit message or to the user instead.

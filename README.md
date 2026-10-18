@@ -139,7 +139,11 @@ Run the service's tests with `npm test`. They use Node's built-in test runner an
 
 ### Deploying to a server
 
-[docs/install.md](docs/install.md) walks through a full install on a fresh Rocky Linux 10 VM: packages, the service account, systemd, SELinux, nginx, and a security checklist for running behind Traefik. It also covers what Claude imports cost.
+Three ways, all expecting an HTTPS reverse proxy such as Traefik in front:
+
+- **Docker:** `ghcr.io/foshiee/nomnoms-recipe-website` holds nginx and the import service in one image. See [docs/docker.md](docs/docker.md).
+- **install.sh:** on a RHEL-family or Debian/Ubuntu server, clone the repo and run `./install.sh`. Run it again after `git pull` to update. See [Quick install](docs/install.md#quick-install-with-installsh).
+- **By hand:** [docs/install.md](docs/install.md) walks through a full install on a fresh Rocky Linux 10 VM: packages, the service account, systemd, SELinux, nginx, and a security checklist for running behind Traefik. It also covers what Claude imports cost.
 
 ## Recipe format
 

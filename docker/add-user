@@ -1,0 +1,5 @@
+#!/bin/sh
+# Adds a user, resets a password, or removes or lists users, as the service's own account.
+# Takes the same arguments as opt/nomnoms-api/tools/add-user.js, for example:
+#   docker exec -it nomnoms add-user yourname --role admin
+exec su-exec node node /opt/nomnoms-api/tools/add-user.js "$@"

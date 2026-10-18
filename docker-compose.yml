@@ -1,0 +1,25 @@
+# docker compose up -d, then create the first admin:
+#   docker compose exec nomnoms add-user yourname --role admin
+# See docs/docker.md.
+services:
+  nomnoms:
+    image: ghcr.io/foshiee/nomnoms-recipe-website:latest
+    # build: .
+    container_name: nomnoms
+    ports:
+      - "8080:80"
+    volumes:
+      - recipes:/var/www/nomnoms/recipes
+      - photos:/var/www/nomnoms/photos
+      - data:/var/lib/nomnoms
+    restart: unless-stopped
+    # environment:
+    #   ANTHROPIC_API_KEY: ""            # or add the key on the admin page
+    #   MODEL: claude-sonnet-5-5
+    #   REAL_IP_FROM: 172.18.0.0/16      # the reverse proxy's address or subnet
+    #   COOKIE_SECURE: "false"           # only for trying it locally over plain http
+
+volumes:
+  recipes:
+  photos:
+  data:
