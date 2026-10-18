@@ -11,7 +11,9 @@
 //
 // Importers and admins:
 //   POST /api/import    multipart "file", or JSON { url } or { text }  -> draft recipe (nothing saved)
-//   POST /api/recipes   { slug, recipe, overwrite? }                   -> writes recipes/<slug>.json
+//   GET  /api/recipes/file?slug=   -> { recipe, version }, the saved file for editing
+//   POST /api/recipes   { slug, recipe, overwrite?, version? }         -> writes recipes/<slug>.json
+//                       (with version, 409 { changed: true } if the file has changed since)
 //   POST /api/recipes/photo          multipart "slug" + "file" (JPEG)    -> writes photos/, sets "image"
 //   POST /api/recipes/photo/delete   { slug }
 //
@@ -41,7 +43,7 @@ import * as settings from './settings.js';
 import { importFile, importText, importUrl, ImportError } from './import/index.js';
 import { testKey, LlmError } from './import/llm.js';
 import { validateRecipe } from './import/validate.js';
-import { saveRecipe, SaveError } from './save.js';
+import { readRecipeFile, saveRecipe, SaveError } from './save.js';
 import * as photos from './photos.js';
 
 class HttpError extends Error {
@@ -233,16 +235,20 @@ const routes = {
     }
   },
 
+  'GET /api/recipes/file': async (req, res) => {
+    requireImporter(req);
+    const slug = new URL(req.url, 'http://x').searchParams.get('slug') || '';
+    send(res, 200, await readRecipeFile(slug));
+  },
+
   'POST /api/recipes': async (req, res) => {
     const user = requireImporter(req);
-    const { slug, recipe, overwrite } = await readJson(req, 512 * 1024);
+    const { slug, recipe, overwrite, version } = await readJson(req, 512 * 1024);
     const v = validateRecipe(recipe);
     if (v.errors.length) return send(res, 422, { error: 'The recipe has problems that need fixing first.', errors: v.errors, warnings: v.warnings });
-    // Replacing a recipe keeps its photo unless the new file names another one
-    const previous = overwrite === true ? await photos.currentImage(slug) : '';
-    if (previous && !v.recipe.image) v.recipe = validateRecipe({ ...v.recipe, image: previous }).recipe;
-    const saved = await saveRecipe(slug, v.recipe, { overwrite: overwrite === true });
-    await photos.replacedPhoto(slug, previous, v.recipe.image);
+    const saved = overwrite === true
+      ? await photos.replaceRecipe(slug, v.recipe, typeof version === 'string' ? version : undefined)
+      : await saveRecipe(slug, v.recipe);
     console.log(`saved by ${user.username}: ${saved.file}${overwrite ? ' (replaced)' : ''}`);
     send(res, 201, { ...saved, warnings: v.warnings });
   },
@@ -393,7 +399,7 @@ const server = http.createServer(async (req, res) => {
     const known = [HttpError, ImportError, SaveError, LlmError, settings.SettingsError, auth.UserError, photos.PhotoError];
     const status = known.some((k) => e instanceof k) ? e.status : 500;
     if (status === 500) console.error(`${req.method} ${pathname}:`, e);
-    if (!res.headersSent) send(res, status, { error: status === 500 ? 'Something went wrong on the server.' : e.message });
+    if (!res.headersSent) send(res, status, status === 500 ? { error: 'Something went wrong on the server.' } : { error: e.message, ...e.data });
   }
 });
 

@@ -179,6 +179,8 @@
     user: null,
     userKnown: false,
     imp: { busy: false, error: '', draft: null },
+    edit: null, // the draft on #/edit/<slug>, kept apart so an import in progress survives
+    editor: getPref('editor', 'form') === 'json' ? 'json' : 'form',
     site: { name: 'Recipes', thumbnails: false },
     photo: { busy: false, msg: null },
     admin: null
@@ -348,8 +350,8 @@
   const accountLinksHtml = () =>
     `Signed in as ${esc(state.user.username)} · ${isAdmin() ? '<a href="#/admin">Admin</a> · ' : ''}<a href="#/password">Change password</a> · <button class="link-button" data-action="logout">Sign out</button>`;
 
-  // Import is offered on the home page to importers and admins, as are the photo buttons on
-  // a recipe page. The footer (outside #app,
+  // Import is offered on the home page to importers and admins, as are the edit and photo
+  // buttons on a recipe page. The footer (outside #app,
   // so it's on every page) links to the admin page for admins, and visitors just see a
   // small sign-in link there. The server checks roles too.
   function drawAccount() {
@@ -931,7 +933,7 @@
     box.innerHTML = r.image ? `<img class="photo hero" src="${esc(r.image)}" alt="${esc(r.title)}" decoding="async">` : '';
   }
 
-  // Importers and admins can add, change or remove the photo of a recipe that's open
+  // Importers and admins can edit the recipe that's open, and add, change or remove its photo
   function drawPhotoTools() {
     const box = document.getElementById('photo-tools');
     const r = state.current;
@@ -942,6 +944,7 @@
     const dis = p.busy ? ' disabled' : '';
     box.innerHTML = (canImport() ? `
       <div class="photo-tools">
+        <a class="button secondary" href="#/edit/${encodeURIComponent(r.slug)}">Edit recipe</a>
         <button class="button secondary" data-action="pick-file" data-for="photo-file"${dis}>${r.image ? 'Change photo' : 'Add photo'}</button>
         ${r.image ? `<button class="button secondary" data-action="photo-remove"${dis}>Remove photo</button>` : ''}
         <input id="photo-file" type="file" accept="image/*" data-action="photo-file" hidden>
@@ -1148,9 +1151,11 @@
   function drawImport() {
     const box = document.getElementById('import-body');
     if (!box) return;
-    box.innerHTML = state.imp.draft ? reviewHtml(state.imp.draft) : sourcesHtml();
-    if (state.imp.draft) drawPreview();
-    else setImportBusy(state.imp.busy);
+    if (state.imp.draft) drawReview();
+    else {
+      box.innerHTML = sourcesHtml();
+      setImportBusy(state.imp.busy);
+    }
   }
 
   function sourcesHtml() {
@@ -1199,19 +1204,11 @@
     setImportBusy(true);
     try {
       const data = await api('import', body instanceof FormData ? { method: 'POST', form: body } : { method: 'POST', json: body });
-      state.imp.draft = {
+      state.imp.draft = newDraft('import', data.slug || '', data.recipe || {}, {
         method: data.method,
         errors: data.errors || [],
-        warnings: data.warnings || [],
-        slug: data.slug || '',
-        text: JSON.stringify(data.recipe, null, 2),
-        saveMsg: '',
-        conflict: false,
-        saving: false,
-        photo: null,
-        photoBusy: false,
-        photoMsg: ''
-      };
+        warnings: data.warnings || []
+      });
       // The photo the web page publishes, offered for review like the rest
       if (data.photo) setDraftPhoto(base64Blob(data.photo.data, data.photo.mediaType));
     } catch (e) {
@@ -1300,23 +1297,172 @@
     runImport(form);
   }
 
+  /* ---------- review & edit ---------- */
+
+  // An import draft and an edit draft look the same. `view` is 'preview' (imports start
+  // there), 'form' or 'json'. In the JSON view `text` is what's being edited, otherwise
+  // `form`; switching views converts one into the other.
+  function newDraft(kind, slug, recipe, extra) {
+    return {
+      kind,
+      slug,
+      view: kind === 'import' ? 'preview' : state.editor,
+      text: JSON.stringify(recipe, null, 2),
+      form: recipeToForm(recipe),
+      errors: [],
+      warnings: [],
+      viewMsg: '',
+      saveMsg: '',
+      conflict: false, // import: a recipe with that file name exists
+      changed: false, // edit: someone saved the recipe after it was opened
+      dirty: false,
+      saving: false,
+      photo: null,
+      photoBusy: false,
+      photoMsg: '',
+      ...extra
+    };
+  }
+
+  const editSlug = () => {
+    const m = location.hash.match(/^#\/edit\/(.+)$/);
+    if (!m) return null;
+    try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+  };
+  const currentDraft = () => (editSlug() !== null ? state.edit : state.imp.draft);
+
+  function parseRecipeText(text) {
+    const raw = JSON.parse(text);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('The recipe must be a JSON object.');
+    return raw;
+  }
+
+  const draftRecipe = (d) => (d.view === 'form' ? formToRecipe(d.form) : parseRecipeText(d.text));
+
+  // The form holds everything as text, the way it's typed. Fields it has no box for, such
+  // as `image` or the author's own, are kept in `extra` and written back unchanged.
+  const FORM_FIELDS = ['title', 'description', 'servings', 'time', 'tags', 'source', 'ingredients', 'steps', 'notes'];
+  const txt = (v) => (v === null || v === undefined ? '' : String(v));
+  const blank = {
+    groups: () => ({ name: '', items: [blank.items()] }),
+    items: () => ({ amount: '', unit: '', name: '', note: '' }),
+    steps: () => ({ title: '', text: '', minutes: '' }),
+    notes: () => ''
+  };
+
+  function recipeToForm(raw) {
+    const extra = {};
+    for (const [k, v] of Object.entries(raw)) if (!FORM_FIELDS.includes(k)) extra[k] = v;
+    const groups = normalizeGroups(raw.ingredients).map((g) => ({
+      name: g.name,
+      items: g.items.map((it) => ({ amount: txt(it.amount), unit: txt(it.unit), name: it.name, note: txt(it.note) }))
+    }));
+    return {
+      title: txt(raw.title),
+      description: txt(raw.description),
+      servings: txt(raw.servings),
+      time: txt(raw.time),
+      tags: Array.isArray(raw.tags) ? raw.tags.join(', ') : '',
+      source: txt(raw.source),
+      groups: groups.length ? groups : [blank.groups()],
+      steps: (Array.isArray(raw.steps) ? raw.steps : []).map((s) =>
+        typeof s === 'string'
+          ? { title: '', text: s, minutes: '' }
+          : { title: txt(s.title), text: txt(s.text), minutes: Number(s.timer) > 0 ? trim(Number(s.timer) / 60, 2) : '' }),
+      notes: Array.isArray(raw.notes) ? raw.notes.map(txt) : raw.notes ? [txt(raw.notes)] : [],
+      extra
+    };
+  }
+
+  // Back to the recipe format, in the order docs/recipe-format.md lists the fields, leaving
+  // out empty boxes and rows. The server checks the result again when it's saved.
+  function formToRecipe(f) {
+    const t = (v) => txt(v).trim();
+    const r = {};
+    for (const k of ['title', 'description']) if (t(f[k])) r[k] = t(f[k]);
+    if (t(f.servings)) r.servings = Number(t(f.servings)) || t(f.servings);
+    if (t(f.time)) r.time = t(f.time);
+    const tags = f.tags.split(',').map(t).filter(Boolean);
+    if (tags.length) r.tags = tags;
+    if (t(f.source)) r.source = t(f.source);
+    if (f.extra.image !== undefined) r.image = f.extra.image;
+
+    const item = (it) => {
+      const [amount, unit, name, note] = [t(it.amount), t(it.unit), t(it.name), t(it.note)];
+      if (!amount && !unit && !name && !note) return null;
+      const o = {};
+      if (amount) o.amount = /^\d+(?:\.\d+)?$/.test(amount) ? Number(amount) : amount;
+      if (unit) o.unit = unit;
+      o.name = name;
+      if (note) o.note = note;
+      return o;
+    };
+    const ingredients = f.groups.flatMap((g) => {
+      const items = g.items.map(item).filter(Boolean);
+      if (t(g.name)) return [{ group: t(g.name), items }];
+      return items; // without a heading, the items sit loose in the list
+    });
+    if (ingredients.length) r.ingredients = ingredients;
+
+    const steps = f.steps.map((s) => {
+      const [title, text] = [t(s.title), t(s.text)];
+      const timer = Math.round(Number(t(s.minutes)) * 60);
+      const hasTimer = Number.isFinite(timer) && timer > 0;
+      if (!title && !text && !hasTimer) return null;
+      if (!title && !hasTimer) return text;
+      const o = {};
+      if (title) o.title = title;
+      o.text = text;
+      if (hasTimer) o.timer = timer;
+      return o;
+    }).filter((s) => s !== null);
+    if (steps.length) r.steps = steps;
+
+    const notes = f.notes.map(t).filter(Boolean);
+    if (notes.length) r.notes = notes;
+    for (const [k, v] of Object.entries(f.extra)) if (k !== 'image') r[k] = v;
+    return r;
+  }
+
+  // Into #import-body, on both the import and the edit page
+  function drawReview() {
+    const box = document.getElementById('import-body');
+    const d = currentDraft();
+    if (!box || !d) return;
+    box.innerHTML = reviewHtml(d);
+    drawPreview();
+  }
+
   function reviewHtml(d) {
-    return `
-      <p class="method method-${esc(d.method)}">${esc(METHOD_TEXT[d.method] || '')}</p>
-      <div id="imp-messages">${messagesHtml(d)}</div>
-      <div class="review">
+    const intro = d.kind === 'import' ? `<p class="method method-${esc(d.method)}">${esc(METHOD_TEXT[d.method] || '')}</p>` : '';
+    const body = d.view === 'preview' ? `
+      <section class="preview solo" aria-labelledby="pv-h">
+        <h2 id="pv-h">Preview</h2>
+        <div id="preview"></div>
+        <div class="actions"><button class="button secondary" data-action="draft-view" data-view="${state.editor}">Edit before saving</button></div>
+      </section>` : `
+      <div class="editor-switch">
+        <span class="field-label" id="es-h">Edit with</span>
+        <div class="seg" role="group" aria-labelledby="es-h">
+          <button data-action="draft-view" data-view="form" aria-pressed="${d.view === 'form'}">Form</button>
+          <button data-action="draft-view" data-view="json" aria-pressed="${d.view === 'json'}">JSON</button>
+        </div>
+      </div>
+      <p id="view-msg" class="form-error" role="alert">${esc(d.viewMsg)}</p>
+      <div class="review editing">
         <section class="preview" aria-labelledby="pv-h">
           <h2 id="pv-h">Preview</h2>
           <div id="preview"></div>
         </section>
         <section class="edit" aria-labelledby="ed-h">
-          <h2 id="ed-h">Recipe file</h2>
-          <p class="hint">Fix anything that's wrong here, then update the preview. The format is described in docs/recipe-format.md.</p>
-          <textarea id="imp-json" spellcheck="false" autocapitalize="none" rows="22" aria-labelledby="ed-h">${esc(d.text)}</textarea>
-          <button class="button secondary" data-action="imp-preview">Update preview</button>
+          <h2 id="ed-h">Recipe</h2>
+          ${d.view === 'form' ? `<div id="form-editor" class="form-editor">${formHtml(d.form)}</div>` : `
+            <p class="hint">The recipe file itself. Fix anything that's wrong here, then update the preview. The format is described in docs/recipe-format.md.</p>
+            <textarea id="imp-json" spellcheck="false" autocapitalize="none" rows="22" aria-labelledby="ed-h">${esc(d.text)}</textarea>
+            <button class="button secondary" data-action="imp-preview">Update preview</button>`}
         </section>
-      </div>
-      <div class="save-bar">
+      </div>`;
+    const bar = d.kind === 'import' ? `
         <h2 class="field-label" id="ph-h">Photo</h2>
         <div id="imp-photo" class="imp-photo" role="group" aria-labelledby="ph-h">${draftPhotoHtml(d)}</div>
         <label for="imp-slug">File name</label>
@@ -1325,9 +1471,190 @@
         <div class="actions">
           <button class="button" data-action="imp-save"${d.saving ? ' disabled' : ''}>Save recipe</button>
           <button class="button secondary" data-action="imp-reset">Start over</button>
-        </div>
+        </div>` : `
+        <p class="field-label">File name</p>
+        <p>${esc(d.slug)}.json</p>
+        <p class="hint">The file name is the recipe's address, so it stays the same. Change the photo on the recipe page.</p>
+        <div class="actions">
+          <button class="button" data-action="imp-save"${d.saving ? ' disabled' : ''}>Save changes</button>
+          <button class="button secondary" data-action="edit-discard">Discard changes</button>
+        </div>`;
+    return `
+      ${intro}
+      <div id="imp-messages">${messagesHtml(d)}</div>
+      ${body}
+      <div class="save-bar">
+        ${bar}
         <div id="save-status" aria-live="polite">${saveStatusHtml(d)}</div>
       </div>`;
+  }
+
+  function setView(view) {
+    const d = currentDraft();
+    if (!d || d.view === view) return;
+    if (view === 'form') {
+      try {
+        if (d.view === 'json') d.form = recipeToForm(parseRecipeText(d.text));
+      } catch (e) {
+        d.viewMsg = `The JSON can't be shown as a form until it's fixed: ${e.message}`;
+        const msg = document.getElementById('view-msg');
+        if (msg) msg.textContent = d.viewMsg;
+        return;
+      }
+    } else if (view === 'json' && d.view === 'form') {
+      d.text = JSON.stringify(formToRecipe(d.form), null, 2);
+    }
+    d.view = view;
+    d.viewMsg = '';
+    state.editor = view;
+    setPref('editor', view);
+    drawReview();
+    const first = app.querySelector('#form-editor [data-f], #imp-json');
+    if (first) first.focus();
+  }
+
+  /* ---------- the form editor ---------- */
+
+  const UNIT_OPTIONS = ['tsp', 'tbsp', 'cup', 'fl oz', 'oz', 'lb', 'g', 'kg', 'ml', 'l'];
+
+  function formHtml(f) {
+    const box = (label, path, value, attrs = '') =>
+      `<label class="fe-field"><span>${label}</span><input data-f="${path}" value="${esc(value)}"${attrs}></label>`;
+    // ↑ ↓ × for one entry of a list; `g` is the group for ingredients
+    const tools = (list, i, n, what, g) => {
+      const at = `data-list="${list}" data-i="${i}"${g === undefined ? '' : ` data-g="${g}"`}`;
+      return `
+        <div class="fe-tools">
+          <button type="button" class="fe-tool" data-action="form-move" data-dir="-1" ${at} aria-label="Move ${what} up"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button type="button" class="fe-tool" data-action="form-move" data-dir="1" ${at} aria-label="Move ${what} down"${i === n - 1 ? ' disabled' : ''}>↓</button>
+          <button type="button" class="fe-tool" data-action="form-remove" ${at} aria-label="Remove ${what}">×</button>
+        </div>`;
+    };
+
+    const groups = f.groups.map((g, gi) => `
+      <div class="fe-group">
+        <div class="fe-group-head">
+          ${box('Group heading', `groups.${gi}.name`, g.name, ' placeholder="Optional, such as For the sauce"')}
+          ${tools('groups', gi, f.groups.length, `group ${gi + 1}`)}
+        </div>
+        ${g.items.map((it, i) => {
+          const what = `ingredient ${i + 1}${f.groups.length > 1 ? ` in group ${gi + 1}` : ''}`;
+          const p = `groups.${gi}.items.${i}`;
+          return `
+          <div class="fe-item">
+            ${box('Amount', `${p}.amount`, it.amount, ' inputmode="decimal"')}
+            ${box('Unit', `${p}.unit`, it.unit, ' list="fe-units" autocapitalize="none"')}
+            ${box('Ingredient', `${p}.name`, it.name)}
+            ${box('Note', `${p}.note`, it.note, ' placeholder="Optional, such as finely chopped"')}
+            ${tools('items', i, g.items.length, what, gi)}
+          </div>`;
+        }).join('')}
+        <button type="button" class="button secondary" data-action="form-add" data-list="items" data-g="${gi}">Add ingredient</button>
+      </div>`).join('');
+
+    const steps = f.steps.map((s, i) => `
+      <div class="fe-step">
+        <div class="fe-step-head">
+          <span class="fe-num">${i + 1}</span>
+          ${box('Heading', `steps.${i}.title`, s.title, ' placeholder="Optional"')}
+          ${box('Timer (minutes)', `steps.${i}.minutes`, s.minutes, ' type="number" min="0" step="any" inputmode="decimal"')}
+          ${tools('steps', i, f.steps.length, `step ${i + 1}`)}
+        </div>
+        <label class="fe-field"><span>Instruction</span><textarea data-f="steps.${i}.text" rows="3">${esc(s.text)}</textarea></label>
+      </div>`).join('');
+
+    const notes = f.notes.map((n, i) => `
+      <div class="fe-note">
+        <label class="fe-field"><span>Note ${i + 1}</span><textarea data-f="notes.${i}" rows="2">${esc(n)}</textarea></label>
+        ${tools('notes', i, f.notes.length, `note ${i + 1}`)}
+      </div>`).join('');
+
+    return `
+      <fieldset>
+        <legend>About the recipe</legend>
+        ${box('Title', 'title', f.title)}
+        ${box('Description', 'description', f.description, ' placeholder="One line, shown under the title"')}
+        <div class="fe-pair">
+          ${box('Servings', 'servings', f.servings, ' type="number" min="1" step="1" inputmode="numeric"')}
+          ${box('Total time', 'time', f.time, ' placeholder="1 hr 15 min"')}
+        </div>
+        ${box('Tags', 'tags', f.tags, ' placeholder="dinner, vegetarian" autocapitalize="none"')}
+        ${box('Source', 'source', f.source, ' placeholder="A web address, a book or a person"')}
+      </fieldset>
+      <fieldset>
+        <legend>Ingredients</legend>
+        <p class="hint">Amounts are for the servings above and scale with them. Write fractions as 1/2 or 1 1/2.</p>
+        <datalist id="fe-units">${UNIT_OPTIONS.map((u) => `<option value="${u}">`).join('')}</datalist>
+        ${groups}
+        <button type="button" class="button secondary" data-action="form-add" data-list="groups">Add group</button>
+      </fieldset>
+      <fieldset>
+        <legend>Method</legend>
+        <p class="hint">Keep quantities out of the instructions: they don't scale with the servings.</p>
+        ${steps}
+        <button type="button" class="button secondary" data-action="form-add" data-list="steps">Add step</button>
+      </fieldset>
+      <fieldset>
+        <legend>Notes</legend>
+        ${notes}
+        <button type="button" class="button secondary" data-action="form-add" data-list="notes">Add note</button>
+      </fieldset>`;
+  }
+
+  // Follows a data-f path such as "groups.0.items.2.amount"
+  function setPath(obj, path, value) {
+    const keys = path.split('.');
+    const last = keys.pop();
+    for (const k of keys) obj = obj[k];
+    obj[last] = value;
+  }
+
+  // The list an add, move or remove button works on, and the path of its entries
+  function formList(f, el) {
+    const g = Number(el.dataset.g);
+    return el.dataset.list === 'items'
+      ? { list: f.groups[g].items, path: `groups.${g}.items` }
+      : { list: f[el.dataset.list], path: el.dataset.list };
+  }
+
+  const FOCUS_FIELD = { groups: 'name', items: 'amount', steps: 'text', notes: '' };
+
+  function formChange(el) {
+    const d = currentDraft();
+    if (!d || d.view !== 'form') return;
+    const { list, path } = formList(d.form, el);
+    const kind = el.dataset.list;
+    const i = Number(el.dataset.i);
+    let focus;
+    if (el.dataset.action === 'form-add') {
+      list.push(blank[kind]());
+      focus = list.length - 1;
+    } else if (el.dataset.action === 'form-move') {
+      const j = i + Number(el.dataset.dir);
+      if (j < 0 || j >= list.length) return;
+      [list[i], list[j]] = [list[j], list[i]];
+      focus = j;
+    } else {
+      if (kind === 'groups' && list[i].items.some((it) => it.name.trim()) && !confirm('Remove this group and its ingredients?')) return;
+      list.splice(i, 1);
+    }
+    d.dirty = true;
+    const box = document.getElementById('form-editor');
+    if (box) box.innerHTML = formHtml(d.form);
+    drawPreview();
+    // Keeps the keyboard where it was: on the new or moved entry, or on what's left
+    let target = null;
+    if (focus !== undefined) {
+      if (el.dataset.action === 'form-move') target = app.querySelector(`[data-action="form-move"][data-dir="${el.dataset.dir}"][data-list="${kind}"][data-i="${focus}"]${kind === 'items' ? `[data-g="${el.dataset.g}"]` : ''}`);
+      if (!target || target.disabled) {
+        const field = FOCUS_FIELD[kind];
+        target = app.querySelector(`[data-f="${path}.${focus}${field ? '.' + field : ''}"]`);
+      }
+    } else {
+      target = app.querySelector(`[data-action="form-add"][data-list="${kind}"]${kind === 'items' ? `[data-g="${el.dataset.g}"]` : ''}`) ||
+        app.querySelector('[data-action="form-add"][data-list="groups"]');
+    }
+    if (target) target.focus();
   }
 
   function messagesHtml(d) {
@@ -1342,11 +1669,16 @@
       return `<p class="form-error">A recipe called "${esc(d.slug)}" already exists. Change the file name, or
         <button class="link-button" data-action="imp-overwrite">replace the existing recipe</button>.</p>`;
     }
+    if (d.changed) {
+      return `<p class="form-error">${esc(d.saveMsg)} You can
+        <button class="link-button" data-action="edit-reload">load the saved version</button>, which loses your changes, or
+        <button class="link-button" data-action="imp-overwrite">save yours over it</button>.</p>`;
+    }
     return d.saveMsg ? `<p class="form-error">${esc(d.saveMsg)}</p>` : '';
   }
 
   function drawSaveStatus() {
-    const d = state.imp.draft;
+    const d = currentDraft();
     const box = document.getElementById('save-status');
     if (box && d) box.innerHTML = saveStatusHtml(d);
     const btn = app.querySelector('[data-action="imp-save"]');
@@ -1355,17 +1687,15 @@
 
   function drawPreview() {
     const box = document.getElementById('preview');
-    const d = state.imp.draft;
+    const d = currentDraft();
     if (!box || !d) return;
-    let raw;
+    let r;
     try {
-      raw = JSON.parse(d.text);
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('The recipe must be a JSON object.');
+      r = normalizeRecipe(draftRecipe(d), (d.slug || 'recipe') + '.json');
     } catch (e) {
       box.innerHTML = `<p class="form-error">The JSON can't be read: ${esc(e.message)}</p>`;
       return;
     }
-    const r = normalizeRecipe(raw, (d.slug || 'recipe') + '.json');
     box.innerHTML = `
       <h3 class="pv-title">${esc(r.title)}</h3>
       ${r.description ? `<p class="desc">${esc(r.description)}</p>` : ''}
@@ -1380,15 +1710,82 @@
       ${r.source ? `<p class="source">Source: ${esc(r.source)}</p>` : ''}`;
   }
 
-  async function saveDraft(overwrite) {
-    const d = state.imp.draft;
+  /* ---------- editing a saved recipe ---------- */
+
+  async function showEdit(slug) {
+    if (!state.userKnown) {
+      app.innerHTML = '<p class="status">Checking sign-in…</p>';
+      return;
+    }
+    drawAccount();
+    if (!state.user) {
+      showSignIn('Sign in to edit recipes.');
+      return;
+    }
+
+    const saved = state.recipes.find((x) => x.slug === slug);
+    pageTitle(saved ? `Edit ${saved.title}` : 'Edit recipe');
+    app.innerHTML = `
+      <section class="import">
+        <a class="back" href="#/r/${encodeURIComponent(slug)}">Back to the recipe</a>
+        <h1>Edit recipe</h1>
+        <div id="import-body"></div>
+      </section>`;
+    if (state.edit && state.edit.slug === slug) {
+      drawReview();
+      return;
+    }
+
+    // Read from the service rather than recipes/, for the version that detects other saves
+    state.edit = null;
+    const box = document.getElementById('import-body');
+    box.innerHTML = '<p class="status">Loading the recipe…</p>';
+    let data;
+    try {
+      data = await api('recipes/file?slug=' + encodeURIComponent(slug));
+    } catch (e) {
+      if (editSlug() !== slug) return; // gone somewhere else meanwhile
+      if (e.status === 401) {
+        state.user = null;
+        showEdit(slug);
+        return;
+      }
+      const missing = e.status === 404 && e.data && e.data.error;
+      box.innerHTML = `<div class="notice"><p><strong>${missing ? "That recipe doesn't exist." : "The recipe couldn't be loaded."}</strong></p>
+        <p>${esc(missing ? 'It may have been renamed or removed.' : e.message)}</p></div>`;
+      return;
+    }
+    if (editSlug() !== slug) return;
+    state.edit = newDraft('edit', slug, data.recipe, { version: data.version });
+    drawReview();
+  }
+
+  function discardEdit() {
+    const d = state.edit;
+    if (!d || (d.dirty && !confirm('Discard your changes to this recipe?'))) return;
+    state.edit = null;
+    location.hash = '#/r/' + encodeURIComponent(d.slug);
+  }
+
+  function reloadEdit() {
+    const d = state.edit;
+    if (!d || !confirm('Load the saved version? Your changes will be lost.')) return;
+    state.edit = null;
+    showEdit(d.slug);
+  }
+
+  // `force`: for an import, replace the recipe with that file name; for an edit, save over
+  // changes someone else made since it was opened
+  async function saveDraft(force) {
+    const d = currentDraft();
     if (!d || d.saving) return;
     d.conflict = false;
+    d.changed = false;
     d.saveMsg = '';
 
     let recipe;
     try {
-      recipe = JSON.parse(d.text);
+      recipe = draftRecipe(d);
     } catch (e) {
       d.saveMsg = `The JSON can't be read: ${e.message}`;
       drawSaveStatus();
@@ -1407,10 +1804,13 @@
       return;
     }
 
+    const body = d.kind === 'edit'
+      ? { slug, recipe, overwrite: true, ...(force === true ? {} : { version: d.version }) }
+      : { slug, recipe, overwrite: force === true };
     d.saving = true;
     drawSaveStatus();
     try {
-      await api('recipes', { method: 'POST', json: { slug, recipe, overwrite: overwrite === true } });
+      await api('recipes', { method: 'POST', json: body });
       // The recipe is saved now, whatever happens to the photo
       if (d.photo) {
         try {
@@ -1420,17 +1820,22 @@
           state.photo.msg = { slug, text: `The recipe was saved, but the photo couldn't be added: ${e.message} Try again from here.` };
         }
       }
-      clearImport();
+      if (d.kind === 'edit') state.edit = null;
+      else clearImport();
       await loadRecipes();
       location.hash = '#/r/' + encodeURIComponent(slug);
       return;
     } catch (e) {
       d.saving = false;
-      if (e.status === 409) d.conflict = true;
+      if (e.status === 409 && e.data && e.data.changed) {
+        d.changed = true;
+        d.saveMsg = e.message;
+      } else if (e.status === 409) d.conflict = true;
       else if (e.status === 401) {
         state.user = null;
-        state.imp.error = 'Your session ended. Sign in again; your draft is kept.';
-        showImport();
+        state.imp.error = `Your session ended. Sign in again; your ${d.kind === 'edit' ? 'changes are' : 'draft is'} kept.`;
+        if (d.kind === 'edit') showEdit(slug);
+        else showImport();
         return;
       } else {
         d.saveMsg = e.message;
@@ -1467,8 +1872,9 @@
     try { await api('logout', { method: 'POST' }); } catch (e) { /* signed out locally anyway */ }
     state.user = null;
     clearImport();
+    state.edit = null;
     state.admin = null;
-    if (ACCOUNT_PAGES.includes(location.hash)) location.hash = '#/';
+    if (isAccountPage()) location.hash = '#/';
     else route(); // signed out from a page anyone can see: no hash change, so redraw directly
   }
 
@@ -1980,6 +2386,7 @@
 
   // Pages that need the sign-in state, and are left when signing out
   const ACCOUNT_PAGES = ['#/import', '#/admin', '#/password'];
+  const isAccountPage = () => ACCOUNT_PAGES.includes(location.hash) || editSlug() !== null;
 
   function route() {
     closeEditor(null);
@@ -1990,8 +2397,10 @@
       let slug = m[1];
       try { slug = decodeURIComponent(slug); } catch (e) { /* keep raw */ }
       showRecipe(slug);
-    } else if (location.hash === '#/password' || (ACCOUNT_PAGES.includes(location.hash) && mustChangePassword())) {
+    } else if (location.hash === '#/password' || (isAccountPage() && mustChangePassword())) {
       showPassword();
+    } else if (editSlug() !== null) {
+      showEdit(editSlug());
     } else if (location.hash === '#/import') {
       showImport();
     } else if (location.hash === '#/admin') {
@@ -2050,6 +2459,14 @@
         break;
       case 'crop-cancel': closeEditor(null); break;
       case 'imp-preview': drawPreview(); break;
+      case 'draft-view': setView(el.dataset.view); break;
+      case 'form-add':
+      case 'form-move':
+      case 'form-remove':
+        formChange(el);
+        break;
+      case 'edit-discard': discardEdit(); break;
+      case 'edit-reload': reloadEdit(); break;
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
       case 'imp-reset':
@@ -2201,8 +2618,14 @@
       drawList();
     } else if (e.target.id === 'crop-zoom' && editor) {
       zoomCrop(Number(e.target.value) / editor.zoom);
-    } else if (e.target.id === 'imp-json' && state.imp.draft) {
-      state.imp.draft.text = e.target.value;
+    } else if (e.target.id === 'imp-json' && currentDraft()) {
+      currentDraft().text = e.target.value;
+      currentDraft().dirty = true;
+    } else if (e.target.dataset.f && currentDraft() && currentDraft().view === 'form') {
+      const d = currentDraft();
+      setPath(d.form, e.target.dataset.f, e.target.value);
+      d.dirty = true;
+      drawPreview();
     } else if (e.target.id === 'imp-slug' && state.imp.draft) {
       state.imp.draft.slug = e.target.value;
       state.imp.draft.conflict = false;
@@ -2219,7 +2642,7 @@
   Promise.all([loadRecipes(), loadSite()]).then(route);
   // Sign-in state is loaded separately so it never holds up the recipe list
   loadUser().then(() => {
-    if (ACCOUNT_PAGES.includes(location.hash)) route();
+    if (isAccountPage()) route();
     else drawAccount();
   });
 })();

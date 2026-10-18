@@ -13,6 +13,7 @@ process.env.PHOTOS_DIR = path.join(tmp, 'photos');
 
 // Imported after the environment is set, because config.js reads it once
 const photos = await import('../photos.js');
+const { readRecipeFile } = await import('../save.js');
 
 before(async () => {
   await fs.mkdir(process.env.RECIPES_DIR);
@@ -66,7 +67,6 @@ test('setting, replacing and removing a photo', async () => {
   assert.equal(r.image, first.image);
   assert.deepEqual(Object.keys(r), ['title', 'source', 'image', 'steps', 'notes', 'author']);
   assert.deepEqual(await fs.readFile(path.join(tmp, first.image)), jpeg());
-  assert.equal(await photos.currentImage('toast'), first.image);
 
   const second = await photos.setPhoto('toast', jpeg(COMMENT, ICC));
   assert.notEqual(second.image, first.image);
@@ -88,11 +88,14 @@ test('photos placed by hand are never deleted', async () => {
   await photos.removePhoto('soup');
   assert.ok((await photoFiles()).includes('my-soup.jpg'));
 
-  // Another recipe's photo isn't this recipe's to delete, even if it's named like ours
-  await photos.replacedPhoto('soup', set.image, '');
+  // Replacing the recipe with one naming another photo drops ours...
+  await writeRecipe('soup', { title: 'Soup', image: set.image, steps: ['Heat it.'] });
+  await photos.replaceRecipe('soup', { title: 'Soup', image: 'photos/my-soup.jpg', steps: ['Heat it.'] });
   assert.deepEqual(await photoFiles(), ['my-soup.jpg']);
+  // ...but another recipe's photo isn't this recipe's to delete, even if it's named like ours
   const other = await photos.setPhoto('toast', jpeg());
-  await photos.replacedPhoto('soup', other.image, '');
+  await writeRecipe('soup', { title: 'Soup', image: other.image, steps: ['Heat it.'] });
+  await photos.replaceRecipe('soup', { title: 'Soup', image: 'photos/my-soup.jpg', steps: ['Heat it.'] });
   assert.ok((await photoFiles()).includes(path.basename(other.image)));
 });
 
@@ -101,5 +104,41 @@ test('unknown recipes and bad names are refused', async () => {
   await assert.rejects(photos.setPhoto('../etc/passwd', jpeg()), (e) => e.status === 400);
   await assert.rejects(photos.removePhoto('index'), (e) => e.status === 400);
   await assert.rejects(photos.setPhoto('toast', Buffer.alloc(photos.MAX_PHOTO_BYTES + 1)), (e) => e.status === 413);
-  assert.equal(await photos.currentImage('../etc/passwd'), '');
+  await assert.rejects(photos.replaceRecipe('../etc/passwd', { steps: ['x'] }), (e) => e.status === 400);
+});
+
+test('editing a recipe checks it has not changed since it was opened', async () => {
+  await writeRecipe('stew', { title: 'Stew', steps: ['Simmer.'] });
+  const opened = await readRecipeFile('stew');
+  assert.match(opened.version, /^[0-9a-f]{16}$/);
+
+  const saved = await photos.replaceRecipe('stew', { title: 'Beef stew', steps: ['Simmer.'] }, opened.version);
+  assert.equal((await readRecipe('stew')).title, 'Beef stew');
+  assert.equal(saved.version, (await readRecipeFile('stew')).version);
+  assert.notEqual(saved.version, opened.version);
+
+  // A second editor still holding the old version is refused, and nothing is written
+  await assert.rejects(photos.replaceRecipe('stew', { title: 'Lamb stew', steps: ['Simmer.'] }, opened.version),
+    (e) => e.status === 409 && e.data.changed === true);
+  assert.equal((await readRecipe('stew')).title, 'Beef stew');
+
+  // A photo change counts as a change, and the photo is kept by a later edit
+  const photo = await photos.setPhoto('stew', jpeg());
+  await assert.rejects(photos.replaceRecipe('stew', { title: 'Stew', steps: ['Simmer.'] }, saved.version), (e) => e.status === 409);
+  await photos.replaceRecipe('stew', { title: 'Stew', steps: ['Simmer.'] }, (await readRecipeFile('stew')).version);
+  assert.equal((await readRecipe('stew')).image, photo.image);
+
+  // Without a version, the last save wins
+  await photos.replaceRecipe('stew', { title: 'Any stew', steps: ['Simmer.'] });
+  assert.equal((await readRecipe('stew')).title, 'Any stew');
+
+  // A recipe removed meanwhile is refused with a version, and recreated without one
+  await fs.rm(recipeFile('stew'));
+  await assert.rejects(photos.replaceRecipe('stew', { steps: ['Simmer.'] }, saved.version), (e) => e.status === 409 && e.data.changed);
+  await photos.replaceRecipe('stew', { steps: ['Simmer.'] });
+  assert.deepEqual(await readRecipe('stew'), { steps: ['Simmer.'] });
+
+  await assert.rejects(readRecipeFile('no-such-recipe'), (e) => e.status === 404);
+  await fs.writeFile(recipeFile('broken'), '{ nope');
+  await assert.rejects(readRecipeFile('broken'), (e) => e.status === 422);
 });

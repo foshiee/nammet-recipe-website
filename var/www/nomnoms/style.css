@@ -632,6 +632,99 @@ h2 {
 .crop-zoom label { font-weight: 600; }
 .crop-zoom input { flex: 1; max-width: 20rem; accent-color: var(--accent); }
 
+/* Review and edit: the preview first on imports, then the form or JSON beside it */
+.preview.solo { max-width: 40rem; margin-top: 1.5rem; }
+
+.editor-switch { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 1.5rem; }
+.editor-switch .field-label { font-weight: 600; }
+.editor-switch .seg { color: var(--accent); }
+.editor-switch .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+#view-msg { margin: .75rem 0 0; }
+
+@media (min-width: 56rem) {
+  .review.editing { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  /* The preview stays in view while a long form scrolls past */
+  .review.editing .preview { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+}
+
+.form-editor fieldset {
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) * 1.5);
+}
+
+.form-editor legend { padding: 0 .35rem; font-family: var(--font-heading); font-size: 1.15rem; font-weight: 600; }
+.form-editor .hint { margin-bottom: .75rem; }
+.form-editor fieldset > .button { margin-top: .25rem; }
+
+.fe-field { display: block; margin-bottom: .75rem; }
+.fe-field > span { display: block; margin-bottom: .2rem; font-size: .85rem; font-weight: 600; }
+.fe-field textarea { resize: vertical; }
+
+.fe-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: .75rem; }
+
+.fe-group, .fe-step {
+  margin-bottom: 1rem;
+  padding: .75rem;
+  border-radius: var(--radius);
+  background: var(--tint);
+}
+
+.fe-group-head, .fe-step-head { display: flex; align-items: flex-end; gap: .5rem; }
+.fe-group-head .fe-field, .fe-step-head .fe-field { flex: 1; min-width: 0; }
+.fe-group-head .fe-tools, .fe-step-head .fe-tools { margin-bottom: .75rem; }
+
+/* Amount, unit and name on one line, the note under them; stacked on phones */
+.fe-item {
+  display: grid;
+  grid-template-columns: 4.5rem 5.5rem minmax(0, 1fr) auto;
+  grid-template-areas: "amt unit name name" "note note note tools";
+  column-gap: .5rem;
+  padding-top: .5rem;
+  border-top: 1px solid var(--line);
+}
+
+.fe-item .fe-field:nth-child(1) { grid-area: amt; }
+.fe-item .fe-field:nth-child(2) { grid-area: unit; }
+.fe-item .fe-field:nth-child(3) { grid-area: name; }
+.fe-item .fe-field:nth-child(4) { grid-area: note; }
+.fe-item .fe-tools { grid-area: tools; align-self: end; margin-bottom: .75rem; }
+.fe-group > .button { margin-top: .25rem; }
+
+/* Narrow screens stack the preview under the editor rather than above it */
+@media (max-width: 55.99rem) {
+  .review.editing .edit { order: -1; }
+}
+
+@media (max-width: 30rem) {
+  .fe-item { grid-template-columns: 1fr 1fr; grid-template-areas: "amt unit" "name name" "note note" "tools tools"; }
+  .fe-step-head { flex-wrap: wrap; }
+}
+
+.fe-num { align-self: center; min-width: 1.5rem; font-family: var(--font-heading); font-size: 1.25rem; font-weight: 600; }
+.fe-note { display: flex; align-items: flex-start; gap: .5rem; }
+.fe-note .fe-field { flex: 1; min-width: 0; }
+.fe-note .fe-tools { margin-top: 1.4rem; }
+
+.fe-tools { display: flex; gap: .25rem; }
+.fe-tool {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fe-tool:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.fe-tool:disabled { opacity: .4; cursor: default; }
+.fe-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .slug-field { display: flex; align-items: center; gap: .35rem; max-width: 32rem; margin-bottom: .35rem; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
 
