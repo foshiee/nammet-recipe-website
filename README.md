@@ -4,6 +4,50 @@ A self-hosted recipe website for one household or a small group. Recipes are pla
 
 An optional Node service adds sign-in, recipe import (from a file, a web page or pasted text) and an admin page. Without it, the site still browses and cooks.
 
+## Screenshots
+
+The light and dark shots follow your GitHub theme, as the site follows your system's.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/recipe-desktop-dark.webp">
+  <img src="docs/screenshots/recipe-desktop.webp" alt="A recipe page: a photo of the dish, the title and description, and a bar with servings and US/metric controls">
+</picture>
+
+Cooking: scaled from 4 to 6 servings and switched to metric, with ingredients and the first step ticked off and its timer running.
+
+<img src="docs/screenshots/cooking-desktop.webp" alt="A recipe in use: ingredients beside the method, three ingredients and step 1 ticked off, and a timer counting down">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-desktop-dark.webp">
+  <img src="docs/screenshots/home-desktop.webp" alt="The home page: site name, search box, tag filters and the recipe list with photo thumbnails">
+</picture>
+
+Searching covers titles, descriptions, tags and ingredients:
+
+<img src="docs/screenshots/search-desktop.webp" alt="The home page with pasta typed into the search box and the list filtered to pasta recipes">
+
+On a phone, the servings bar stays at the top of the screen while you cook:
+
+<table>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-phone-dark.webp">
+        <img src="docs/screenshots/home-phone.webp" width="260" alt="The recipe list on a phone">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/recipe-phone-dark.webp">
+        <img src="docs/screenshots/recipe-phone.webp" width="260" alt="A recipe page on a phone">
+      </picture>
+    </td>
+    <td>
+      <img src="docs/screenshots/cooking-phone.webp" width="260" alt="The method on a phone, with a step ticked off and a timer running">
+    </td>
+  </tr>
+</table>
+
 ## Features
 
 **For cooking**

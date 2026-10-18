@@ -23,6 +23,7 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `docs/recipe-format.md` | n/a | Authoritative recipe JSON spec. |
 | `docs/install.md` | n/a | Server setup from a fresh Rocky Linux 10 VM, running the import service, and the security checklist. |
 | `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
+| `docs/screenshots/` | n/a | WebP screenshots used by the README, in light and dark versions where the README swaps them by theme. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
 
 ## Running and testing
