@@ -2,11 +2,12 @@
 
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 
-- **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check and edit it, add a photo of the finished dish, and save it straight into the recipes folder. It appears on the site immediately. A web page's own recipe photo is offered automatically.
+- **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check the preview, edit it if needed, add a photo of the finished dish, and save it straight into the recipes folder. It appears on the site immediately. A web page's own recipe photo is offered automatically.
+- **Edit recipe** (importers and admins), under the title of any recipe: change it in a form, or as the raw JSON file for those who prefer it (the browser remembers which). If someone else saves the recipe while you're editing, saving stops and asks whether to load their version or save yours over it. The file name, which is the recipe's address, can't be changed here.
 - **Add photo / Change photo / Remove photo** (importers and admins), under the title of any recipe.
 - **Admin** (admins only), also at `#/admin`: change the site name and icon, pick a colour theme (each has light and dark colours) and fine-tune its colours, choose the fonts and corner rounding, and show photos on the home page; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
 
-There are two roles. **Admins** can do everything. **Importers** can only import recipes and change their photos. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
+There are two roles. **Admins** can do everything. **Importers** can only import and edit recipes and change their photos. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
 
 A password set for someone else, whether on the admin page or with the command-line tool, is temporary. At their first sign-in they're asked to choose their own, and they can't do anything else until they have. Anyone signed in can also change their password at any time with **Change password** next to **Sign out**. There's no "forgot password" link: that would need some other way to prove who you are, such as email, so a forgotten password is reset by an admin, who hands over a new temporary one.
 
@@ -216,8 +217,9 @@ The address to use, and how to find it, is in the security checklist below.
 2. Click it and sign in. You'll be asked to choose your own password (unless you used `--permanent`), then you should land on the import screen, and the home page should now show **Import recipe** at the top right.
 3. Import a recipe web page, such as one from BBC Good Food or Allrecipes. The review screen should say *Read from the recipe data the web page publishes*.
 4. Save it. You should land on the new recipe, and it should be on the home page.
-5. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
-6. Watch it all in the log: `journalctl -u nomnoms-api -f`.
+5. Use **Edit recipe** on it, change something small such as the time, and save. The recipe page should show the change.
+6. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
+7. Watch it all in the log: `journalctl -u nomnoms-api -f`.
 
 If any of this doesn't work, see [Troubleshooting](#troubleshooting).
 
