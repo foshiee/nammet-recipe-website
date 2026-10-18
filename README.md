@@ -6,7 +6,7 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 
 ## Screenshots
 
-The light and dark shots follow your GitHub theme, as the site follows your system's.
+The light and dark shots follow your GitHub theme, as the site follows your system's unless you pick one.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/recipe-desktop-dark.webp">
@@ -58,7 +58,7 @@ On a phone, the servings bar stays at the top of the screen while you cook:
 - Tick off ingredients and steps as you go.
 - Step timers with an alarm that keeps beeping until you dismiss it.
 - A "Keep screen on" option, using the Screen Wake Lock API, so your phone doesn't lock with flour on your hands.
-- Light and dark mode follow the system setting.
+- Light and dark mode follow the system setting, or a button in the corner of every page forces either one (remembered per browser).
 
 **With the import service**
 

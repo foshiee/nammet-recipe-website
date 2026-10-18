@@ -76,7 +76,8 @@ test('colour themes and contrast', () => {
 test('theme css and favicon', () => {
   const css = settings.renderThemeCss(settings.DEFAULT_APPEARANCE);
   assert.match(css, /--accent: #2447b8;/);
-  assert.match(css, /prefers-color-scheme: dark[\s\S]*--accent: #8eaaff;/);
+  assert.match(css, /prefers-color-scheme: dark[\s\S]*:root:not\(\[data-theme="light"\]\) \{[^}]*--accent: #8eaaff;/);
+  assert.match(css, /:root\[data-theme="dark"\] \{[^}]*--accent: #8eaaff;/);
   assert.match(css, /--font-heading: "Iowan Old Style"/);
   assert.match(css, /--radius: 8px;/);
 

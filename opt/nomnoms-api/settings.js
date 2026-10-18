@@ -240,9 +240,13 @@ ${vars(a.colors.light)}
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
 ${vars(a.colors.dark).replace(/^/gm, '  ')}
   }
+}
+
+:root[data-theme="dark"] {
+${vars(a.colors.dark)}
 }
 `;
 }

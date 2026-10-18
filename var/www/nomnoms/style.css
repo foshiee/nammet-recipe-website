@@ -16,8 +16,10 @@
   --radius: 8px;
 }
 
+/* Dark follows the system unless the toggle sets data-theme on <html>.
+   The two dark blocks must match. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0e1519;
     --ink: #e8efec;
     --muted: #9aaca8;
@@ -29,6 +31,21 @@
     --danger: #ff8a80;
   }
 }
+
+:root[data-theme="dark"] {
+  --bg: #0e1519;
+  --ink: #e8efec;
+  --muted: #9aaca8;
+  --line: #2a3a3f;
+  --accent: #8eaaff;
+  --on-accent: #0e1519;
+  --tint: #1b2845;
+  --field: #131d22;
+  --danger: #ff8a80;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 
@@ -112,6 +129,42 @@ h1 {
 }
 
 .home-head .button { margin-top: .5rem; }
+
+/* Keeps the heading and Import button clear of the theme toggle until the column clears it */
+@media (max-width: 68rem) {
+  .home-head { padding-right: 2.75rem; }
+}
+
+/* Light / Dark / System, pinned to the corner of every page */
+.theme-toggle {
+  position: fixed;
+  top: .75rem;
+  right: .75rem;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.theme-toggle:hover { color: var(--accent); }
+.theme-toggle[hidden] { display: none; }
+
+.theme-toggle svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 .count { margin: .35rem 0 1.75rem; color: var(--muted); }
 
@@ -301,6 +354,11 @@ h1 {
   border-radius: calc(var(--radius) * 1.5);
   background: var(--accent);
   color: var(--on-accent);
+}
+
+/* Stuck at the top, it would slide under the theme toggle */
+@media (max-width: 68rem) {
+  .controls { margin-right: 2.75rem; }
 }
 
 .stepper { display: flex; align-items: center; gap: .5rem; }
@@ -904,9 +962,9 @@ h2 {
 }
 
 @media print {
-  /* html:root outranks the colours in theme/theme.css */
-  html:root { --bg: #fff; --ink: #000; --muted: #333; --line: #bbb; --accent: #000; }
-  .back, .controls, .wake, .timer-slot, .tags, .button, .photo-tools, .site-foot { display: none !important; }
+  /* html:root:root outranks the dark selectors here and in theme/theme.css */
+  html:root:root { --bg: #fff; --ink: #000; --muted: #333; --line: #bbb; --accent: #000; color-scheme: light; }
+  .back, .controls, .wake, .timer-slot, .tags, .button, .photo-tools, .site-foot, .theme-toggle { display: none !important; }
   .photo.hero { max-height: 8cm; }
   .page { padding: 0; }
   .cols { grid-template-columns: 1fr 1.6fr; gap: 2rem; }

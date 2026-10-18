@@ -181,6 +181,7 @@
     imp: { busy: false, error: '', draft: null },
     edit: null, // the draft on #/edit/<slug>, kept apart so an import in progress survives
     editor: getPref('editor', 'form') === 'json' ? 'json' : 'form',
+    theme: ['light', 'dark'].includes(getPref('theme', '')) ? getPref('theme', '') : 'system',
     site: { name: 'Recipes', thumbnails: false },
     photo: { busy: false, msg: null },
     admin: null
@@ -2061,8 +2062,7 @@
     if (!a) return;
     const o = a.settings.options;
     const root = document.documentElement.style;
-    const scheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    for (const [k, v] of Object.entries(a.look.colors[scheme])) root.setProperty('--' + k, v);
+    for (const [k, v] of Object.entries(a.look.colors[scheme()])) root.setProperty('--' + k, v);
     root.setProperty('--font-heading', o.fonts[a.look.fonts.heading].stack);
     root.setProperty('--font-body', o.fonts[a.look.fonts.body].stack);
     root.setProperty('--radius', a.look.radius + 'px');
@@ -2412,7 +2412,45 @@
     window.scrollTo(0, 0);
   }
 
+  /* ---------- colour scheme ---------- */
+
+  // The corner button cycles System → Light → Dark. A forced choice sets data-theme on
+  // <html>, which style.css and theme.css read; index.html applies the saved one before
+  // the page paints.
+  const themeButton = document.getElementById('theme-toggle');
+  const THEME_ORDER = ['system', 'light', 'dark'];
+  const THEME_ICONS = {
+    system: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    dark: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'
+  };
+  const THEME_NAMES = { system: 'System', light: 'Light', dark: 'Dark' };
+
+  const scheme = () =>
+    state.theme !== 'system' ? state.theme
+      : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+  function applyTheme() {
+    const root = document.documentElement;
+    if (state.theme === 'system') delete root.dataset.theme;
+    else root.dataset.theme = state.theme;
+    const next = THEME_ORDER[(THEME_ORDER.indexOf(state.theme) + 1) % THEME_ORDER.length];
+    const label = `Colour scheme: ${THEME_NAMES[state.theme]}. Switch to ${THEME_NAMES[next].toLowerCase()}`;
+    themeButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${THEME_ICONS[state.theme]}</svg>`;
+    themeButton.setAttribute('aria-label', label);
+    themeButton.title = label;
+    themeButton.hidden = false;
+  }
+
   /* ---------- events ---------- */
+
+  themeButton.addEventListener('click', () => {
+    state.theme = THEME_ORDER[(THEME_ORDER.indexOf(state.theme) + 1) % THEME_ORDER.length];
+    setPref('theme', state.theme);
+    applyTheme();
+    // An unsaved admin preview is inline on <html>; repaint it in the new scheme
+    if (document.documentElement.style.length) previewLook();
+  });
 
   // The account footer sits outside #app so it's on every page; its only action is signing out
   foot.addEventListener('click', (e) => {
@@ -2639,6 +2677,7 @@
 
   window.addEventListener('hashchange', route);
 
+  applyTheme();
   Promise.all([loadRecipes(), loadSite()]).then(route);
   // Sign-in state is loaded separately so it never holds up the recipe list
   loadUser().then(() => {
