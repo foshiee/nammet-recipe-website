@@ -135,9 +135,10 @@ h1 {
   .home-head { padding-right: 2.75rem; }
 }
 
-/* Light / Dark / System, pinned to the corner of every page */
+/* Light / Dark / System, pinned to the corner of every page. On phones it scrolls away
+   instead, so it doesn't cover list titles or squeeze the sticky cooking strip. */
 .theme-toggle {
-  position: fixed;
+  position: absolute;
   top: .75rem;
   right: .75rem;
   z-index: 10;
@@ -151,6 +152,10 @@ h1 {
   background: var(--field);
   color: var(--ink);
   cursor: pointer;
+}
+
+@media (min-width: 40rem) {
+  .theme-toggle { position: fixed; }
 }
 
 .theme-toggle:hover { color: var(--accent); }
@@ -356,8 +361,8 @@ h1 {
   color: var(--on-accent);
 }
 
-/* Stuck at the top, it would slide under the theme toggle */
-@media (max-width: 68rem) {
+/* Stuck at the top, it would slide under the theme toggle (which scrolls away on phones) */
+@media (min-width: 40rem) and (max-width: 68rem) {
   .controls { margin-right: 2.75rem; }
 }
 
