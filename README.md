@@ -69,6 +69,13 @@ On a phone, the servings bar stays at the top of the screen while you cook:
 - Add, crop and replace recipe photos. Photos are re-encoded in the browser, which strips EXIF and GPS data, and stripped again on the server.
 - An admin page for user accounts (admin and importer roles), the site name and favicon, colour themes with a contrast checker, fonts and corner radius, and the Claude model and API key.
 
+Editing a saved recipe in the form, with a live preview beside it:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/edit-desktop-dark.webp">
+  <img src="docs/screenshots/edit-desktop.webp" alt="The edit page: a Form or JSON switch, a preview of the recipe on the left and the form's title, description, servings, time, tags and source fields on the right">
+</picture>
+
 ## How it fits together
 
 ```
