@@ -64,7 +64,8 @@ On a phone, the servings bar stays at the top of the screen while you cook:
 
 - Import from a recipe web page. Pages with schema.org Recipe markup (most recipe sites) are parsed directly with no AI involved, and the page's photo comes along.
 - Import from a PDF, a photo of a cookbook page, plain text or a page without markup, using Claude through the Anthropic API. This is the only feature that needs an API key.
-- Review every import before saving: a preview, the raw JSON to edit, and validation warnings such as quantities written into step text (which wouldn't scale).
+- Review every import before saving: a preview, an editor, and validation warnings such as quantities written into step text (which wouldn't scale).
+- Edit saved recipes from the recipe page, in a form or as raw JSON (the site remembers which you prefer). If someone else saves the recipe while you're editing, you're asked before anything is overwritten.
 - Add, crop and replace recipe photos. Photos are re-encoded in the browser, which strips EXIF and GPS data, and stripped again on the server.
 - An admin page for user accounts (admin and importer roles), the site name and favicon, colour themes with a contrast checker, fonts and corner radius, and the Claude model and API key.
 

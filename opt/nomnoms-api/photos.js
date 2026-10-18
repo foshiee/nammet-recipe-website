@@ -13,14 +13,15 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
-import { checkSlug, saveRecipe } from './save.js';
+import { readRecipeFile, saveRecipe, SaveError } from './save.js';
 
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 export class PhotoError extends Error {
-  constructor(message, status = 400) {
+  constructor(message, status = 400, data) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -59,28 +60,11 @@ async function removeOwned(slug, image) {
 }
 
 async function readRecipe(slug) {
-  const problem = checkSlug(slug);
-  if (problem) throw new PhotoError(problem, 400);
-  let text;
   try {
-    text = await fs.readFile(path.join(config.recipesDir, slug + '.json'), 'utf8');
+    return (await readRecipeFile(slug)).recipe;
   } catch (e) {
-    if (e.code === 'ENOENT') throw new PhotoError("That recipe doesn't exist.", 404);
-    throw e;
-  }
-  try {
-    const recipe = JSON.parse(text);
-    if (recipe && typeof recipe === 'object' && !Array.isArray(recipe)) return recipe;
-  } catch { /* reported below */ }
-  throw new PhotoError("That recipe's file can't be read, so its photo can't be changed.", 422);
-}
-
-// The photo a saved recipe has now, or '' (also for unknown or unreadable recipes)
-export async function currentImage(slug) {
-  try {
-    return String((await readRecipe(slug)).image || '');
-  } catch {
-    return '';
+    if (!(e instanceof SaveError)) throw e;
+    throw new PhotoError(e.status === 422 ? "That recipe's file can't be read, so its photo can't be changed." : e.message, e.status);
   }
 }
 
@@ -143,6 +127,25 @@ export function removePhoto(slug) {
   });
 }
 
-// After a recipe file has been replaced: drops our old photo if the new file doesn't use it
-export const replacedPhoto = (slug, previous, now) =>
-  previous && previous !== now ? serial(() => removeOwned(slug, previous)) : Promise.resolve();
+// Replaces a saved recipe, keeping its photo unless the new file names another one.
+// With a version (from readRecipeFile), it refuses when the file has changed since, which
+// includes a photo change. In the queue, so nothing can save in between check and write.
+export function replaceRecipe(slug, recipe, version) {
+  return serial(async () => {
+    let current = null;
+    try {
+      current = await readRecipeFile(slug);
+    } catch (e) {
+      if (!(e instanceof SaveError) || e.status === 400) throw e;
+    }
+    if (version !== undefined && version !== null) {
+      if (!current) throw new PhotoError('Someone removed this recipe after you opened it.', 409, { changed: true });
+      if (current.version !== version) throw new PhotoError('Someone changed this recipe after you opened it.', 409, { changed: true });
+    }
+    const previous = current ? String(current.recipe.image || '') : '';
+    const out = previous && !recipe.image ? withImage(recipe, previous) : recipe;
+    const saved = await saveRecipe(slug, out, { overwrite: true });
+    if (previous && previous !== out.image) await removeOwned(slug, previous);
+    return saved;
+  });
+}

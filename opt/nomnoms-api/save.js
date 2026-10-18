@@ -40,6 +40,26 @@ export class SaveError extends Error {
   }
 }
 
+// Identifies one state of a recipe file, so an edit can tell whether someone saved in between
+export const recipeVersion = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
+
+export async function readRecipeFile(slug, { dir = config.recipesDir } = {}) {
+  const problem = checkSlug(slug);
+  if (problem) throw new SaveError(problem, 400);
+  let text;
+  try {
+    text = await fs.readFile(path.join(path.resolve(dir), slug + '.json'), 'utf8');
+  } catch (e) {
+    if (e.code === 'ENOENT') throw new SaveError("That recipe doesn't exist.", 404);
+    throw e;
+  }
+  try {
+    const recipe = JSON.parse(text);
+    if (recipe && typeof recipe === 'object' && !Array.isArray(recipe)) return { recipe, version: recipeVersion(text) };
+  } catch { /* reported below */ }
+  throw new SaveError("That recipe's file can't be read.", 422);
+}
+
 export async function saveRecipe(slug, recipe, { overwrite = false, dir = config.recipesDir } = {}) {
   const problem = checkSlug(slug);
   if (problem) throw new SaveError(problem, 400);
@@ -49,7 +69,8 @@ export async function saveRecipe(slug, recipe, { overwrite = false, dir = config
   if (path.dirname(target) !== dir) throw new SaveError('Invalid file name.', 400); // belt and braces
 
   const tmp = path.join(dir,`.${slug}.${crypto.randomBytes(6).toString('hex')}.tmp`);
-  await fs.writeFile(tmp, JSON.stringify(recipe, null, 2) + '\n', { encoding: 'utf8', mode: 0o644, flag: 'wx' });
+  const text = JSON.stringify(recipe, null, 2) + '\n';
+  await fs.writeFile(tmp, text, { encoding: 'utf8', mode: 0o644, flag: 'wx' });
   try {
     if (overwrite) {
       await fs.rename(tmp, target);
@@ -70,5 +91,5 @@ export async function saveRecipe(slug, recipe, { overwrite = false, dir = config
     if (e.code === 'EEXIST') throw new SaveError(`A recipe called "${slug}" already exists.`, 409);
     throw e;
   }
-  return { slug, file: slug + '.json' };
+  return { slug, file: slug + '.json', version: recipeVersion(text) };
 }
