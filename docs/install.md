@@ -101,12 +101,13 @@ cd ~/nomnoms-recipe-website
 ./install.sh
 ```
 
-Run it as your normal user; it asks for your sudo password. It asks for the reverse proxy's address (see the [security checklist](#security-checklist-traefik-in-front) for which to use), whether Cloudflare is in front, your Anthropic API key (optional), and a name for the first admin, then checks the site answers. To skip the questions, give the answers as options:
+Run it as your normal user; it asks for your sudo password. It asks for the reverse proxy's address (see the [security checklist](#security-checklist-traefik-in-front) for which to use), whether Cloudflare is in front, your Anthropic API key (optional), and a name for the first admin, then checks the site answers. Updates don't ask about the proxy or Cloudflare again; they keep what's in the installed nginx config unless you give `--proxy`, `--cloudflare` or `--no-cloudflare`. To skip the questions, give the answers as options:
 
 | Option | |
 |---|---|
-| `--proxy ADDR[,ADDR]` | The reverse proxy's IP address or CIDR range. Fills in the real-IP lines in the nginx config and, if firewalld or ufw is running, opens port 80 to that address only. |
+| `--proxy ADDR[,ADDR]` | The reverse proxy's IP address or CIDR range. Fills in the real-IP lines in the nginx config and, if firewalld or ufw is running, opens port 80 to that address only. `--proxy ''` clears the addresses. |
 | `--cloudflare` | Also trusts Cloudflare's ranges (written to `/etc/nginx/cloudflare-ips.inc`). |
+| `--no-cloudflare` | Stops trusting Cloudflare's ranges. |
 | `--admin NAME` | Creates the first admin. You're still asked for the password. |
 | `--no-admin` | Skips the first admin. |
 | `--yes` | Asks nothing and uses the options given. Without `--admin`, it prints the command for creating the admin. |

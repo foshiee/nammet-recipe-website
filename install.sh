@@ -3,7 +3,7 @@
 # Run it again after `git pull --ff-only` to update. It never touches your recipes,
 # photos, users, settings or an existing /etc/nomnoms/api.env.
 #
-#   ./install.sh [--proxy ADDR[,ADDR]] [--cloudflare] [--admin NAME | --no-admin] [--yes]
+#   ./install.sh [--proxy ADDR[,ADDR]] [--cloudflare | --no-cloudflare] [--admin NAME | --no-admin] [--yes]
 #
 # Supports the RHEL family (Rocky, Alma, RHEL, CentOS Stream, Fedora) and Debian/Ubuntu.
 set -euo pipefail
@@ -16,8 +16,10 @@ Installs or updates the nomnoms site and import service on this machine.
 Run it from the cloned repo as your normal user; it asks for sudo.
 
   --proxy ADDR[,ADDR]  The reverse proxy's IP address or CIDR range (Traefik, for
-                       example), so nginx sees visitors' real addresses. Kept on updates.
+                       example), so nginx sees visitors' real addresses. Kept on updates;
+                       --proxy '' clears it.
   --cloudflare         Also trust Cloudflare's address ranges. Kept on updates.
+  --no-cloudflare      Stop trusting Cloudflare's address ranges.
   --admin NAME         Create this first admin (you're asked for the password).
   --no-admin           Don't create a first admin.
   --yes                Don't ask questions; use the defaults and the options given.
@@ -41,6 +43,7 @@ while [ $# -gt 0 ]; do
     --proxy) [ $# -ge 2 ] || die "--proxy needs an address"; PROXY=$2; PROXY_SET=1; shift 2 ;;
     --proxy=*) PROXY=${1#*=}; PROXY_SET=1; shift ;;
     --cloudflare) CLOUDFLARE=1; shift ;;
+    --no-cloudflare) CLOUDFLARE=0; shift ;;
     --admin) [ $# -ge 2 ] || die "--admin needs a user name"; ADMIN=$2; shift 2 ;;
     --admin=*) ADMIN=${1#*=}; shift ;;
     --no-admin) NO_ADMIN=1; shift ;;
@@ -237,7 +240,7 @@ if [ -z "$CLOUDFLARE" ]; then
     case "$(ask "Is Cloudflare in front of the site? [y/N]" n)" in [Yy]*) CLOUDFLARE=1 ;; esac
   fi
 fi
-if [ -z "$PROXY" ] && [ "$INTERACTIVE" = 1 ]; then
+if [ -z "$PROXY" ] && [ "$UPDATE" = 0 ] && [ "$PROXY_SET" = 0 ] && [ "$INTERACTIVE" = 1 ]; then
   echo "nginx needs the reverse proxy's address (Traefik's, for example) to see visitors' real"
   echo "addresses. Use its IP, its Docker network's subnet such as 172.18.0.0/16, or 127.0.0.1 if"
   echo "it runs on this machine. See the security checklist in docs/install.md."
