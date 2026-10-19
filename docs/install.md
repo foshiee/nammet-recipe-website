@@ -90,9 +90,39 @@ curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://github.com/
 
 Any number counts as success, including `404`; it only proves the VM can reach the site.
 
-## Installing the site and import service
+## Quick install with install.sh
 
-The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so the clone stays yours; only the commands that install files use `sudo`.
+`install.sh` in the repo runs steps 4 to 12 below for you, and running it again later updates the install. It supports the RHEL family (Rocky, Alma, RHEL, CentOS Stream, Fedora) and Debian or Ubuntu. On anything else, follow the steps by hand. To run the site in Docker instead, see [docker.md](docker.md).
+
+```sh
+sudo dnf -y install git      # or: sudo apt install git
+git clone https://github.com/foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
+cd ~/nomnoms-recipe-website
+./install.sh
+```
+
+Run it as your normal user; it asks for your sudo password. It asks for the reverse proxy's address (see the [security checklist](#security-checklist-traefik-in-front) for which to use), whether Cloudflare is in front, your Anthropic API key (optional), and a name for the first admin, then checks the site answers. Updates don't ask about the proxy or Cloudflare again; they keep what's in the installed nginx config unless you give `--proxy`, `--cloudflare` or `--no-cloudflare`. To skip the questions, give the answers as options:
+
+| Option | |
+|---|---|
+| `--proxy ADDR[,ADDR]` | The reverse proxy's IP address or CIDR range. Fills in the real-IP lines in the nginx config and, if firewalld or ufw is running, opens port 80 to that address only. `--proxy ''` clears the addresses. |
+| `--cloudflare` | Also trusts Cloudflare's ranges (written to `/etc/nginx/cloudflare-ips.inc`). |
+| `--no-cloudflare` | Stops trusting Cloudflare's ranges. |
+| `--admin NAME` | Creates the first admin. You're still asked for the password. |
+| `--no-admin` | Skips the first admin. |
+| `--yes` | Asks nothing and uses the options given. Without `--admin`, it prints the command for creating the admin. |
+
+What it does, and doesn't do:
+
+- It installs the packages it needs, but doesn't upgrade the system. On the RHEL family it installs the repo's `nginx.conf`, as in step 12, keeping the old one as `nginx.conf.bak`. On Debian and Ubuntu it keeps the distro's `nginx.conf` and removes the `sites-enabled/default` site, which would clash with this one. If the distro's Node.js is older than 20, it adds NodeSource's Node.js 22 repository (on RHEL 9, it switches to the `nodejs:22` module stream instead).
+- It writes `/etc/nomnoms/api.env` only if it doesn't exist yet. After that, edit it by hand.
+- It writes `/etc/nginx/conf.d/nomnoms.conf` from the repo's copy each time, keeping the proxy addresses and Cloudflare setting already in it. If the file had other changes, it shows them and keeps the old file as `nomnoms.conf.bak`. If `nginx -t` fails, it puts the old file back.
+- It only adds firewall rules if firewalld or ufw is already running. Without `--proxy`, it opens port 80 to everyone and says so.
+- It never touches the recipes, photos, users or the admin page's settings.
+
+## Installing the site and import service by hand
+
+These are the steps `install.sh` runs. The VM keeps its own clone of the repo and installs from it. The repo mirrors the server's layout, so each file is copied from its repo path to the same path on the server. Run everything as your normal user, which needs sudo rights. Run git commands without `sudo` so the clone stays yours; only the commands that install files use `sudo`.
 
 ### 4. Clone the repo
 
@@ -279,20 +309,15 @@ What the service does to protect itself:
 - **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer] [--permanent]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). The password is temporary unless you pass `--permanent`, for example when resetting your own. Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
 - **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** in `~/nomnoms-recipe-website`, pull the changes, then reinstall the website and the service code and restart the service:
+- **Updating:** in `~/nomnoms-recipe-website`, pull the changes and run the installer again. This works for an install done by hand too.
 
   ```sh
   git pull --ff-only
   git log --oneline ORIG_HEAD..     # lists what came in
-  sudo install -m 0644 var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css var/www/nomnoms/robots.txt /var/www/nomnoms/
-  sudo restorecon -Rv /var/www/nomnoms
-  sudo rm -rf /opt/nomnoms-api
-  sudo cp -r opt/nomnoms-api /opt/nomnoms-api
-  cd /opt/nomnoms-api && sudo npm ci --omit=dev && cd -
-  sudo systemctl restart nomnoms-api
+  ./install.sh
   ```
 
-  Removing `/opt/nomnoms-api` before copying means a file deleted from the repo doesn't linger there. `cp -r` on its own only adds and overwrites, and copying onto an existing folder would put the code inside it as `/opt/nomnoms-api/nomnoms-api`. Nothing the service keeps is stored there. Your users, settings, theme, `api.env`, the recipes and their photos all live outside the clone, so updates don't touch them.
+  It replaces the website and the service code (building the new code beside the old, so a failed `npm ci` leaves the running service alone), updates the nginx config while keeping your proxy settings, and restarts the service. Your users, settings, theme, `api.env`, the recipes and their photos are left as they are.
 
 ## Cost of Claude imports
 

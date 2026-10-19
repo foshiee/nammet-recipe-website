@@ -14,13 +14,14 @@ This is a one-person hobby project, so replies are best effort and there's no bu
 
 ## Supported versions
 
-Only the latest commit on `master` is supported. There are no releases, so fixes go straight to `master`.
+Only the latest commit on `master` and the latest published Docker image are supported. Fixes go straight to `master`, and a new image follows.
 
 ## In scope
 
 - The import service (`opt/nomnoms-api`): sign-in, sessions, roles and the rate limits; the admin and import routes; fetching web addresses (it should refuse private and internal addresses); file uploads; and where it writes files.
 - The front end (`var/www/nomnoms`): for example, recipe data or admin settings that can run script in a visitor's browser.
 - The nginx and systemd configuration in `etc/`, when it's installed as described in [docs/install.md](docs/install.md).
+- `install.sh`, and the Docker image (`Dockerfile`, `docker/`) run as described in [docs/docker.md](docs/docker.md).
 
 ## Out of scope
 
