@@ -93,10 +93,21 @@ function changeUsers(fn, file = config.usersFile) {
   return run;
 }
 
-function checkPassword(password) {
-  if (typeof password !== 'string' || password.length < MIN_PASSWORD) {
-    throw new UserError(`Passwords must be at least ${MIN_PASSWORD} characters.`);
+export const PASSWORD_RULE = `at least ${MIN_PASSWORD} characters, with a lowercase letter, an uppercase letter, a number and a symbol`;
+
+// A message saying what a new password is missing, or '' if it's fine.
+export function passwordProblem(password) {
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD ||
+      !/\p{Ll}/u.test(password) || !/\p{Lu}/u.test(password) || !/\p{N}/u.test(password) ||
+      !/[^\p{L}\p{N}\s]/u.test(password)) {
+    return `Passwords need ${PASSWORD_RULE}.`;
   }
+  return '';
+}
+
+function checkPassword(password) {
+  const problem = passwordProblem(password);
+  if (problem) throw new UserError(problem);
 }
 
 function checkRole(role) {

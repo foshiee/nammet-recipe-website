@@ -47,16 +47,16 @@ jobs:
           docker run -d --name nomnoms -p 8080:80 -e COOKIE_SECURE=false \
             -v recipes:/var/www/nomnoms/recipes -v photos:/var/www/nomnoms/photos -v data:/var/lib/nomnoms nomnoms:test
           for _ in $(seq 30); do curl -fs http://127.0.0.1:8080/api/me && break; sleep 1; done
-          printf 'smoke-test-password\n' | docker exec -i nomnoms add-user smoketest
+          printf 'Smoke-test-pass-1\n' | docker exec -i nomnoms add-user smoketest
       - name: Smoke test
         env:
           SMOKE_USER: smoketest
-          SMOKE_PASSWORD: smoke-test-password
+          SMOKE_PASSWORD: Smoke-test-pass-1
         run: sh docker/smoke-test.sh http://127.0.0.1:8080
       - name: Restart keeps users, and stops promptly
         env:
           SMOKE_USER: smoketest
-          SMOKE_PASSWORD: smoke-test-password
+          SMOKE_PASSWORD: Smoke-test-pass-1
         run: |
           start=$(date +%s)
           docker stop nomnoms
@@ -86,16 +86,16 @@ jobs:
       - name: Create a test user
         run: |
           cd /opt/nomnoms-api
-          printf 'smoke-test-password\n' | sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js smoketest --role admin
+          printf 'Smoke-test-pass-1\n' | sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js smoketest --role admin
       - name: Smoke test
         env:
           SMOKE_USER: smoketest
-          SMOKE_PASSWORD: smoke-test-password
+          SMOKE_PASSWORD: Smoke-test-pass-1
         run: sh docker/smoke-test.sh http://127.0.0.1
       - name: Running it again keeps the settings
         env:
           SMOKE_USER: smoketest
-          SMOKE_PASSWORD: smoke-test-password
+          SMOKE_PASSWORD: Smoke-test-pass-1
         run: |
           before=$(sudo sha256sum /etc/nomnoms/api.env /var/lib/nomnoms/users.json)
           ./install.sh --yes

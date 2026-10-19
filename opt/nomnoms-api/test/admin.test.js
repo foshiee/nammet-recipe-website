@@ -154,28 +154,28 @@ test('claude settings: admin page overrides the environment', async () => {
 });
 
 test('user management and roles', async () => {
-  await auth.createUser({ username: 'Boss', password: 'correct horse battery', role: 'admin' });
-  await auth.createUser({ username: 'cook', password: 'correct horse battery', role: 'importer' });
+  await auth.createUser({ username: 'Boss', password: 'Correct horse battery 1!', role: 'admin' });
+  await auth.createUser({ username: 'cook', password: 'Correct horse battery 1!', role: 'importer' });
   assert.deepEqual(await auth.listUsers(), [
     { username: 'boss', role: 'admin', mustChangePassword: false },
     { username: 'cook', role: 'importer', mustChangePassword: false }
   ]);
 
-  await assert.rejects(auth.createUser({ username: 'cook', password: 'correct horse battery', role: 'importer' }), /already/);
+  await assert.rejects(auth.createUser({ username: 'cook', password: 'Correct horse battery 1!', role: 'importer' }), /already/);
   await assert.rejects(auth.createUser({ username: 'new', password: 'short', role: 'importer' }), /at least/);
-  await assert.rejects(auth.createUser({ username: 'new', password: 'correct horse battery', role: 'owner' }), /Role/);
+  await assert.rejects(auth.createUser({ username: 'new', password: 'Correct horse battery 1!', role: 'owner' }), /Role/);
 
   // Never leave the site without an admin
   await assert.rejects(auth.updateUser('boss', { role: 'importer' }), /only admin/);
   await assert.rejects(auth.deleteUser('boss'), /only admin/);
 
-  const session = await auth.login('cook', 'correct horse battery', '127.0.0.1');
+  const session = await auth.login('cook', 'Correct horse battery 1!', '127.0.0.1');
   assert.equal(session.user.role, 'importer');
   await auth.updateUser('cook', { role: 'admin' });
   assert.equal(auth.getSession(session.token).role, 'admin', 'role changes apply to open sessions');
   await auth.updateUser('boss', { role: 'importer' });
 
-  await auth.updateUser('cook', { password: 'another long password' });
+  await auth.updateUser('cook', { password: 'Another long password 2!' });
   assert.equal(auth.getSession(session.token), null, 'a password reset signs the user out');
 
   await auth.deleteUser('boss');
@@ -185,42 +185,50 @@ test('user management and roles', async () => {
   const raw = await auth.readUsers();
   raw.push({ ...raw[0], username: 'norole', role: undefined }, { ...raw[0], username: 'odd', role: 'owner' });
   await auth.writeUsers(raw);
-  assert.equal((await auth.login('norole', 'another long password', '127.0.0.2')).user.role, 'importer');
-  assert.equal((await auth.login('odd', 'another long password', '127.0.0.3')).error, 'invalid');
+  assert.equal((await auth.login('norole', 'Another long password 2!', '127.0.0.2')).user.role, 'importer');
+  assert.equal((await auth.login('odd', 'Another long password 2!', '127.0.0.3')).error, 'invalid');
+});
+
+test('password rules', () => {
+  assert.equal(auth.passwordProblem('Abcdefgh123!'), '');
+  assert.equal(auth.passwordProblem('Ünïcödé-Pässwörd-9'), '');
+  for (const weak of ['Abcdefg123!', 'abcdefgh123!', 'ABCDEFGH123!', 'Abcdefghijk!', 'Abcdefgh1234', 'Abcdefgh 123', null]) {
+    assert.match(auth.passwordProblem(weak), /at least 12 characters/, String(weak));
+  }
 });
 
 test('temporary passwords', async () => {
   const flagged = async (name) => (await auth.listUsers()).find((u) => u.username === name).mustChangePassword;
 
-  await auth.createUser({ username: 'temp', password: 'set by the admin', role: 'importer', temporary: true });
+  await auth.createUser({ username: 'temp', password: 'Set by the admin 3!', role: 'importer', temporary: true });
   assert.equal(await flagged('temp'), true);
-  const first = await auth.login('temp', 'set by the admin', '10.0.0.1');
-  const other = await auth.login('temp', 'set by the admin', '10.0.0.1');
+  const first = await auth.login('temp', 'Set by the admin 3!', '10.0.0.1');
+  const other = await auth.login('temp', 'Set by the admin 3!', '10.0.0.1');
   assert.equal(first.user.mustChangePassword, true);
   assert.equal(auth.getSession(first.token).mustChangePassword, true);
 
-  await assert.rejects(auth.changePassword('temp', 'not the password', 'my very own password', '10.0.0.1', first.token), /current password/);
-  await assert.rejects(auth.changePassword('temp', 'set by the admin', 'set by the admin', '10.0.0.1', first.token), /different/);
-  await assert.rejects(auth.changePassword('temp', 'set by the admin', 'short', '10.0.0.1', first.token), /at least/);
+  await assert.rejects(auth.changePassword('temp', 'not the password', 'My very own password 4!', '10.0.0.1', first.token), /current password/);
+  await assert.rejects(auth.changePassword('temp', 'Set by the admin 3!', 'Set by the admin 3!', '10.0.0.1', first.token), /different/);
+  await assert.rejects(auth.changePassword('temp', 'Set by the admin 3!', 'short', '10.0.0.1', first.token), /at least/);
 
-  const changed = await auth.changePassword('temp', 'set by the admin', 'my very own password', '10.0.0.1', first.token);
+  const changed = await auth.changePassword('temp', 'Set by the admin 3!', 'My very own password 4!', '10.0.0.1', first.token);
   assert.equal(changed.user.mustChangePassword, false);
   assert.equal(await flagged('temp'), false);
   assert.equal(auth.getSession(first.token).mustChangePassword, false, 'the session that changed it carries on');
   assert.equal(auth.getSession(other.token), null, 'other sessions are signed out');
-  assert.equal((await auth.login('temp', 'my very own password', '10.0.0.1')).user.mustChangePassword, false);
+  assert.equal((await auth.login('temp', 'My very own password 4!', '10.0.0.1')).user.mustChangePassword, false);
 
   // An admin reset is temporary only when asked; a role change leaves the flag alone
-  await auth.updateUser('temp', { password: 'reset by the admin', temporary: true });
+  await auth.updateUser('temp', { password: 'Reset by the admin 5!', temporary: true });
   assert.equal(await flagged('temp'), true);
   await auth.updateUser('temp', { role: 'admin' });
   assert.equal(await flagged('temp'), true);
-  await auth.updateUser('temp', { password: 'reset by themselves' });
+  await auth.updateUser('temp', { password: 'Reset by themselves 6!' });
   assert.equal(await flagged('temp'), false);
 
   // Wrong current passwords count towards the sign-in limit
   for (let i = 0; i < 5; i++) {
-    await assert.rejects(auth.changePassword('temp', 'wrong guess', 'my very own password', '10.0.0.2'), /current password/);
+    await assert.rejects(auth.changePassword('temp', 'wrong guess', 'My very own password 4!', '10.0.0.2'), /current password/);
   }
-  assert.equal((await auth.changePassword('temp', 'reset by themselves', 'my very own password', '10.0.0.2')).error, 'rate');
+  assert.equal((await auth.changePassword('temp', 'Reset by themselves 6!', 'My very own password 4!', '10.0.0.2')).error, 'rate');
 });

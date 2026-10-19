@@ -196,7 +196,7 @@ No quotes or spaces around the key. You can also leave it empty and add the key 
 
 ### 9. Create your login
 
-This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory. The password is temporary, so you'll choose your own the first time you sign in. Add `--permanent` to skip that.
+This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory. The password is temporary, so you'll choose your own the first time you sign in. Add `--permanent` to skip that.
 
 ```sh
 cd /opt/nomnoms-api

@@ -24,7 +24,7 @@ docker run -d --name nomnoms --restart unless-stopped -p 8080:80 \
 docker exec -it nomnoms add-user yourname --role admin
 ```
 
-`add-user` asks for a password of at least 12 characters. It's temporary: you'll choose your own the first time you sign in. Add `--permanent` to skip that. Everyone else can be added from the admin page.
+`add-user` asks for a password of at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. It's temporary: you'll choose your own the first time you sign in. Add `--permanent` to skip that. Everyone else can be added from the admin page.
 
 The site is now on port 8080. Point your reverse proxy at it, then work through the [security checklist](install.md#security-checklist-traefik-in-front); the parts about the real-IP lines are handled by `REAL_IP_FROM` below.
 
