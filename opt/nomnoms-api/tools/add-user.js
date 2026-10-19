@@ -22,7 +22,7 @@
 
 import readline from 'node:readline';
 import { config } from '../config.js';
-import { readUsers, listUsers, createUser, updateUser, deleteUser, USERNAME_RE, MIN_PASSWORD, ROLES } from '../auth.js';
+import { readUsers, listUsers, createUser, updateUser, deleteUser, USERNAME_RE, passwordProblem, ROLES } from '../auth.js';
 
 function ask(prompt, hidden) {
   return new Promise((resolve) => {
@@ -79,7 +79,7 @@ async function main() {
 
   const temporary = !args.includes('--permanent');
   const password = await ask('Password: ', true);
-  if (password.length < MIN_PASSWORD) fail(`Passwords must be at least ${MIN_PASSWORD} characters.`);
+  if (passwordProblem(password)) fail(passwordProblem(password));
   if (process.stdin.isTTY && (await ask("Repeat password: ", true)) !== password) fail("The passwords don't match.");
 
   const users = await readUsers();

@@ -369,7 +369,7 @@ if [ "$NO_ADMIN" = 0 ] && ! has_users; then
     ADMIN=$(ask "User name for the first admin (empty to skip):" "")
   fi
   if [ -n "$ADMIN" ]; then
-    echo "Passwords need at least 12 characters. This one is temporary: you'll choose your own at your first sign-in."
+    echo "Passwords need at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. This one is temporary: you'll choose your own at your first sign-in."
     (cd /opt/nomnoms-api && sudo -u nomnoms USERS_FILE="$USERS_FILE" /usr/bin/node tools/add-user.js "$ADMIN" --role admin) \
       || note "Creating the admin failed. Try again with: $ADD_USER_CMD"
   else

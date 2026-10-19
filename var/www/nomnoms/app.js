@@ -1079,7 +1079,7 @@
           <input id="pw-new" name="password" type="password" minlength="12" autocomplete="new-password" required data-secret>
           <label for="pw-repeat">Repeat new password</label>
           <input id="pw-repeat" name="repeat" type="password" minlength="12" autocomplete="new-password" required data-secret>
-          <p class="hint">At least 12 characters. Your other sessions will be signed out.</p>
+          <p class="hint">At least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Your other sessions will be signed out.</p>
           <button class="button" type="submit">${forced ? 'Set password' : 'Change password'}</button>
           <p id="pw-status" class="form-error" role="alert"></p>
         </form>
@@ -2305,7 +2305,7 @@
         <p class="hint">Lowercase letters, numbers, ".", "_" or "-".</p>
         <label for="ad-new-pass">Password</label>
         <input id="ad-new-pass" name="password" type="password" minlength="12" required autocomplete="new-password" data-secret>
-        <p class="hint">At least 12 characters. Share it with them privately. They'll choose their own when they first sign in.</p>
+        <p class="hint">At least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Share it with them privately. They'll choose their own when they first sign in.</p>
         <label for="ad-new-role">Role</label>
         <select id="ad-new-role" name="role">${roleOptions('importer')}</select>
         <div class="actions"><button class="button" type="submit">Add user</button></div>
