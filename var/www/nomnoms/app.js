@@ -357,7 +357,7 @@
   // small sign-in link there. The server checks roles too.
   function drawAccount() {
     const head = document.getElementById('account-head');
-    if (head) head.innerHTML = canImport() ? '<a class="button" href="#/import">Import recipe</a>' : '';
+    if (head) head.innerHTML = canImport() ? '<a class="button" href="#/import">Add recipe</a>' : '';
     drawPhotoTools();
     foot.innerHTML = !state.userKnown ? ''
       : state.user ? accountLinksHtml()
@@ -400,7 +400,7 @@
 
     if (!state.recipes.length) {
       empty.hidden = false;
-      empty.textContent = 'No recipes yet. Sign in and use Import recipe, or add a .json file to the recipes folder on the server and reload this page.';
+      empty.textContent = 'No recipes yet. Sign in and use Add recipe, or add a .json file to the recipes folder on the server and reload this page.';
     } else if (!shown.length) {
       empty.hidden = false;
       empty.innerHTML = 'Nothing matches your search. <button class="link-button" data-action="clear">Clear search</button>';
@@ -1026,12 +1026,25 @@
   }
 
   const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+  // A file name from a title, the same way the service makes one (slugify in save.js)
+  const slugify = (title) => String(title || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/, '');
   const MAX_UPLOAD = 20 * 1024 * 1024;
 
   const METHOD_TEXT = {
     json: 'Read directly from a recipe file.',
     jsonld: 'Read from the recipe data the web page publishes. No AI was involved.',
-    claude: 'Extracted by Claude. Check the amounts, units and steps against the original before saving.'
+    claude: 'Extracted by Claude. Check the amounts, units and steps against the original before saving.',
+    manual: 'Fill in the recipe below. The preview updates as you type.'
   };
 
   // Shared by #/import and #/admin. After signing in, route() shows the page that was asked for.
@@ -1139,11 +1152,11 @@
       return;
     }
 
-    pageTitle('Import a recipe');
+    pageTitle('Add a recipe');
     app.innerHTML = `
       <section class="import">
         <a class="back" href="#/">All recipes</a>
-        <h1>Import a recipe</h1>
+        <h1>Add a recipe</h1>
         <div id="import-body"></div>
       </section>`;
     drawImport();
@@ -1161,7 +1174,7 @@
 
   function sourcesHtml() {
     return `
-      <p class="lede">Bring in a recipe from a file, a web page or pasted text. You'll check it before anything is saved.</p>
+      <p class="lede">Bring in a recipe from a file, a web page or pasted text, or write it yourself. You'll check it before anything is saved.</p>
       <div id="imp-status" class="imp-status" aria-live="polite">${importStatusHtml()}</div>
       <div class="sources">
         <form class="source" data-action="import-file" data-drop>
@@ -1183,6 +1196,11 @@
           <textarea name="text" rows="6" aria-label="Recipe text" required></textarea>
           <button class="button" type="submit">Import text</button>
         </form>
+        <div class="source">
+          <h2>Write it yourself</h2>
+          <p class="hint">Fill in a form: ingredients, steps, timers and notes.</p>
+          <button class="button" type="button" data-action="imp-new">Start a recipe</button>
+        </div>
       </div>`;
   }
 
@@ -1218,6 +1236,15 @@
     }
     state.imp.busy = false;
     if (location.hash === '#/import') showImport();
+  }
+
+  // An empty draft, straight into the form. Its file name follows the title until typed.
+  function newRecipe() {
+    state.imp.error = '';
+    state.imp.draft = newDraft('import', '', {}, { method: 'manual', view: 'form', slugAuto: true });
+    drawImport();
+    const first = app.querySelector('#form-editor [data-f]');
+    if (first) first.focus();
   }
 
   function clearImport() {
@@ -2507,7 +2534,9 @@
       case 'edit-reload': reloadEdit(); break;
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
+      case 'imp-new': newRecipe(); break;
       case 'imp-reset':
+        if (state.imp.draft && state.imp.draft.dirty && !confirm('Discard this recipe?')) break;
         clearImport();
         drawImport();
         break;
@@ -2663,9 +2692,15 @@
       const d = currentDraft();
       setPath(d.form, e.target.dataset.f, e.target.value);
       d.dirty = true;
+      if (d.slugAuto && e.target.dataset.f === 'title') {
+        d.slug = slugify(e.target.value);
+        const slug = document.getElementById('imp-slug');
+        if (slug) slug.value = d.slug;
+      }
       drawPreview();
     } else if (e.target.id === 'imp-slug' && state.imp.draft) {
       state.imp.draft.slug = e.target.value;
+      state.imp.draft.slugAuto = false;
       state.imp.draft.conflict = false;
       drawSaveStatus();
     } else if (e.target.form && e.target.form.dataset.action === 'admin-look' && state.admin) {

@@ -2,7 +2,7 @@
 
 A self-hosted recipe website for one household or a small group. Recipes are plain JSON files in a folder, the front end is a single HTML page with vanilla JavaScript and CSS, and nginx serves the lot. There is no database, no build step and no front-end dependencies.
 
-An optional Node service adds sign-in, recipe import (from a file, a web page or pasted text) and an admin page. Without it, the site still browses and cooks.
+An optional Node service adds sign-in, recipe import (from a file, a web page or pasted text), adding recipes in a form, and an admin page. Without it, the site still browses and cooks.
 
 ## Screenshots
 
@@ -64,6 +64,7 @@ On a phone, the servings bar stays at the top of the screen while you cook:
 
 - Import from a recipe web page. Pages with schema.org Recipe markup (most recipe sites) are parsed directly with no AI involved, and the page's photo comes along.
 - Import from a PDF, a photo of a cookbook page, plain text or a page without markup, using Claude through the Anthropic API. This is the only feature that needs an API key.
+- Write a recipe yourself in the same form, with a live preview and a photo.
 - Review every import before saving: a preview, an editor, and validation warnings such as quantities written into step text (which wouldn't scale).
 - Edit saved recipes from the recipe page, in a form or as raw JSON (the site remembers which you prefer). If someone else saves the recipe while you're editing, you're asked before anything is overwritten.
 - Add, crop and replace recipe photos. Photos are re-encoded in the browser, which strips EXIF and GPS data, and stripped again on the server.

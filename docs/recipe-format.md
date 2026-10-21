@@ -6,7 +6,7 @@ Each recipe on the site is one JSON file in the `recipes/` folder. The site list
 
 Recipe files go in `/var/www/nomnoms/recipes/` on the web server. A new file shows up after a page refresh; nginx does not need a reload.
 
-You can also sign in (link at the bottom of the home page) and use the **Import recipe** button. It converts a recipe file, web page, PDF, photo or pasted text into this format, lets you check and edit the result, and saves it in this folder. Signed in, **Edit recipe** on a recipe's page changes it later, in a form or as JSON. Setup is described in [install.md](install.md).
+You can also sign in (link at the bottom of the home page) and use the **Add recipe** button. It converts a recipe file, web page, PDF, photo or pasted text into this format, or gives you an empty form to fill in, lets you check and edit the result, and saves it in this folder. Signed in, **Edit recipe** on a recipe's page changes it later, in a form or as JSON. Setup is described in [install.md](install.md).
 
 The file name, without `.json`, becomes the recipe's web address. `garlic-tomato-spaghetti.json` is served at `https://your-site/#/r/garlic-tomato-spaghetti`. Use lowercase letters, numbers and hyphens, and avoid spaces. Renaming a file changes its address, so any bookmark to the old name stops working.
 
