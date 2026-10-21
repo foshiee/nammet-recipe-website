@@ -2,7 +2,7 @@
 
 Visitors see no sign of the import feature apart from a small **Sign in** link at the bottom of the home page, which opens `#/import` (you can bookmark it too). Once you're signed in, buttons appear at the top right of the home page and stay for the session (7 days by default):
 
-- **Import recipe** (importers and admins): import a recipe from a file, a web address or pasted text, check the preview, edit it if needed, add a photo of the finished dish, and save it straight into the recipes folder. It appears on the site immediately. A web page's own recipe photo is offered automatically.
+- **Add recipe** (importers and admins): import a recipe from a file, a web address or pasted text, or write one in a form, check the preview, edit it if needed, add a photo of the finished dish, and save it straight into the recipes folder. It appears on the site immediately. A web page's own recipe photo is offered automatically.
 - **Edit recipe** (importers and admins), under the title of any recipe: change it in a form, or as the raw JSON file for those who prefer it (the browser remembers which). If someone else saves the recipe while you're editing, saving stops and asks whether to load their version or save yours over it. The file name, which is the recipe's address, can't be changed here.
 - **Add photo / Change photo / Remove photo** (importers and admins), under the title of any recipe.
 - **Admin** (admins only), also at `#/admin`: change the site name and icon, pick a colour theme (each has light and dark colours) and fine-tune its colours, choose the fonts and corner rounding, and show photos on the home page; add, test or remove the Anthropic API key and pick the model and effort; and add users, change their roles, reset passwords and remove them.
@@ -244,7 +244,7 @@ The address to use, and how to find it, is in the security checklist below.
 ### 13. Check it end to end
 
 1. Open the site in a browser over HTTPS. There should be a small **Sign in** link at the bottom of the home page.
-2. Click it and sign in. You'll be asked to choose your own password (unless you used `--permanent`), then you should land on the import screen, and the home page should now show **Import recipe** at the top right.
+2. Click it and sign in. You'll be asked to choose your own password (unless you used `--permanent`), then you should land on the import screen, and the home page should now show **Add recipe** at the top right.
 3. Import a recipe web page, such as one from BBC Good Food or Allrecipes. The review screen should say *Read from the recipe data the web page publishes*.
 4. Save it. You should land on the new recipe, and it should be on the home page.
 5. Use **Edit recipe** on it, change something small such as the time, and save. The recipe page should show the change.
