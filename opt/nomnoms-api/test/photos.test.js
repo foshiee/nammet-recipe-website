@@ -142,3 +142,33 @@ test('editing a recipe checks it has not changed since it was opened', async () 
   await fs.writeFile(recipeFile('broken'), '{ nope');
   await assert.rejects(readRecipeFile('broken'), (e) => e.status === 422);
 });
+
+test('deleting a recipe removes its file and our photo, nothing else', async () => {
+  await writeRecipe('cake', { title: 'Cake', steps: ['Bake it.'] });
+  const photo = await photos.setPhoto('cake', jpeg());
+  const opened = await readRecipeFile('cake');
+
+  // A stale version is refused and nothing is removed
+  await writeRecipe('cake', { title: 'Better cake', image: photo.image, steps: ['Bake it.'] });
+  await assert.rejects(photos.deleteRecipe('cake', opened.version), (e) => e.status === 409 && e.data.changed === true);
+  assert.equal((await readRecipe('cake')).title, 'Better cake');
+  assert.ok((await photoFiles()).includes(path.basename(photo.image)));
+
+  assert.deepEqual(await photos.deleteRecipe('cake', (await readRecipeFile('cake')).version), { slug: 'cake' });
+  await assert.rejects(fs.access(recipeFile('cake')));
+  assert.ok(!(await photoFiles()).includes(path.basename(photo.image)));
+
+  // A photo placed by hand stays
+  await writeRecipe('pie', { title: 'Pie', image: 'photos/my-soup.jpg', steps: ['Bake it.'] });
+  await photos.deleteRecipe('pie');
+  assert.ok((await photoFiles()).includes('my-soup.jpg'));
+
+  // A file that can't be read can still be deleted
+  await fs.writeFile(recipeFile('mess'), '{ nope');
+  await photos.deleteRecipe('mess');
+  await assert.rejects(fs.access(recipeFile('mess')));
+
+  await assert.rejects(photos.deleteRecipe('cake'), (e) => e.status === 404);
+  await assert.rejects(photos.deleteRecipe('../etc/passwd'), (e) => e.status === 400);
+  await assert.rejects(photos.deleteRecipe('index'), (e) => e.status === 400);
+});

@@ -1506,6 +1506,7 @@
         <div class="actions">
           <button class="button" data-action="imp-save"${d.saving ? ' disabled' : ''}>Save changes</button>
           <button class="button secondary" data-action="edit-discard">Discard changes</button>
+          ${isAdmin() ? `<button class="button secondary danger" data-action="edit-delete"${d.saving ? ' disabled' : ''}>Delete recipe</button>` : ''}
         </div>`;
     return `
       ${intro}
@@ -1692,10 +1693,14 @@
   }
 
   function saveStatusHtml(d) {
-    if (d.saving) return '<p class="working">Saving…</p>';
+    if (d.saving) return `<p class="working">${d.deleting ? 'Deleting…' : 'Saving…'}</p>`;
     if (d.conflict) {
       return `<p class="form-error">A recipe called "${esc(d.slug)}" already exists. Change the file name, or
         <button class="link-button" data-action="imp-overwrite">replace the existing recipe</button>.</p>`;
+    }
+    if (d.changed && d.deleting) {
+      return `<p class="form-error">${esc(d.saveMsg)}
+        <button class="link-button" data-action="edit-reload">Load the saved version</button> to check it before deleting.</p>`;
     }
     if (d.changed) {
       return `<p class="form-error">${esc(d.saveMsg)} You can
@@ -1709,8 +1714,9 @@
     const d = currentDraft();
     const box = document.getElementById('save-status');
     if (box && d) box.innerHTML = saveStatusHtml(d);
-    const btn = app.querySelector('[data-action="imp-save"]');
-    if (btn && d) btn.disabled = d.saving;
+    for (const btn of app.querySelectorAll('[data-action="imp-save"], [data-action="edit-delete"]')) {
+      if (d) btn.disabled = d.saving;
+    }
   }
 
   function drawPreview() {
@@ -1795,6 +1801,47 @@
     location.hash = '#/r/' + encodeURIComponent(d.slug);
   }
 
+  // Deletes the recipe being edited. Sends the version it was opened at, so a change
+  // someone saved since isn't deleted unseen.
+  async function deleteRecipe() {
+    const d = state.edit;
+    if (!d || d.saving || !isAdmin()) return;
+    const saved = state.recipes.find((x) => x.slug === d.slug);
+    const name = saved ? saved.title : d.slug;
+    if (!confirm(`Delete "${name}"? This removes the recipe and its photo for everyone, and can't be undone.`)) return;
+    d.conflict = false;
+    d.changed = false;
+    d.saveMsg = '';
+    d.saving = true;
+    d.deleting = true;
+    drawSaveStatus();
+    try {
+      await api('recipes/delete', { method: 'POST', json: { slug: d.slug, version: d.version } });
+    } catch (e) {
+      if (e.status !== 404) { // 404: someone deleted it already, which is what was asked
+        d.saving = false;
+        if (e.status === 409 && e.data && e.data.changed) {
+          d.changed = true;
+          d.saveMsg = e.message;
+        } else {
+          d.deleting = false;
+          if (e.status === 401) {
+            state.user = null;
+            state.imp.error = 'Your session ended. Sign in again to delete the recipe.';
+            showEdit(d.slug);
+            return;
+          }
+          d.saveMsg = e.message;
+        }
+        drawSaveStatus();
+        return;
+      }
+    }
+    state.edit = null;
+    await loadRecipes();
+    location.hash = '#/';
+  }
+
   function reloadEdit() {
     const d = state.edit;
     if (!d || !confirm('Load the saved version? Your changes will be lost.')) return;
@@ -1809,6 +1856,7 @@
     if (!d || d.saving) return;
     d.conflict = false;
     d.changed = false;
+    d.deleting = false;
     d.saveMsg = '';
 
     let recipe;
@@ -2532,6 +2580,7 @@
         break;
       case 'edit-discard': discardEdit(); break;
       case 'edit-reload': reloadEdit(); break;
+      case 'edit-delete': deleteRecipe(); break;
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
       case 'imp-new': newRecipe(); break;
