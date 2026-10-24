@@ -18,6 +18,8 @@
 //   POST /api/recipes/photo/delete   { slug }
 //
 // Admins only:
+//   POST /api/recipes/delete       { slug, version? }   removes the recipe and its photo
+//                                  (with version, 409 { changed: true } if the file has changed since)
 //   GET  /api/admin/settings       -> appearance, Claude settings (never the key itself), options
 //   POST /api/admin/appearance     { siteName, favicon, theme, colors, fonts, radius }
 //   POST /api/admin/favicon        multipart "file" (PNG, ICO or WebP)
@@ -268,6 +270,14 @@ const routes = {
     const { slug } = await readJson(req, 16 * 1024);
     const result = await photos.removePhoto(String(slug || ''));
     console.log(`photo removed by ${user.username}: ${slug}`);
+    send(res, 200, result);
+  },
+
+  'POST /api/recipes/delete': async (req, res) => {
+    const user = requireAdmin(req);
+    const { slug, version } = await readJson(req, 16 * 1024);
+    const result = await photos.deleteRecipe(String(slug || ''), typeof version === 'string' ? version : undefined);
+    console.log(`recipe deleted by ${user.username}: ${result.slug}`);
     send(res, 200, result);
   },
 

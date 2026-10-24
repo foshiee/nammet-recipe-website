@@ -7,7 +7,8 @@
 //
 // File names carry a hash of the content (photos/<slug>-<hash>.jpg), so a replaced photo
 // gets a new address and nginx can let browsers cache them. Only files named that way
-// are ever deleted; photos placed on the server by hand are left alone.
+// are ever deleted; photos placed on the server by hand are left alone. Deleting a recipe
+// happens here too, in the same queue, since it removes the recipe's photo with it.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -147,5 +148,24 @@ export function replaceRecipe(slug, recipe, version) {
     const saved = await saveRecipe(slug, out, { overwrite: true });
     if (previous && previous !== out.image) await removeOwned(slug, previous);
     return saved;
+  });
+}
+
+// Deletes a recipe and the photo this service made for it. With a version, it refuses
+// when the file has changed since. A file that can't be parsed can still be deleted.
+export function deleteRecipe(slug, version) {
+  return serial(async () => {
+    let current = null;
+    try {
+      current = await readRecipeFile(slug);
+    } catch (e) {
+      if (!(e instanceof SaveError) || e.status !== 422) throw e;
+    }
+    if (version !== undefined && version !== null && (!current || current.version !== version)) {
+      throw new PhotoError('Someone changed this recipe after you opened it.', 409, { changed: true });
+    }
+    await fs.rm(path.join(config.recipesDir, slug + '.json'));
+    if (current) await removeOwned(slug, current.recipe.image);
+    return { slug };
   });
 }

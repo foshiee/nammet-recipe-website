@@ -106,6 +106,8 @@ button { font: inherit; }
 
 .button.secondary { background: transparent; color: var(--accent); }
 .button.secondary:hover { background: var(--tint); }
+.button.danger { border-color: var(--danger); color: var(--danger); }
+.actions .button.danger { margin-left: auto; }
 .button:disabled { opacity: .5; cursor: default; }
 
 /* ---------- Home ---------- */
