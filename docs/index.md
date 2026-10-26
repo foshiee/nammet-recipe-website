@@ -4,7 +4,8 @@ A self-hosted recipe website for one household or a small group. Recipes are pla
 
 An optional Node service adds sign-in, recipe import (from a file, a web page or pasted text), adding recipes in a form, and an admin page. Without it, the site still browses and cooks.
 
-![A recipe page: a photo of the dish, the title and description, and a bar with servings and US/metric controls](screenshots/recipe-desktop.webp)
+![A recipe page: a photo of the dish, the title and description, and a bar with servings and US/metric controls](screenshots/recipe-desktop.webp#only-light)
+![A recipe page: a photo of the dish, the title and description, and a bar with servings and US/metric controls](screenshots/recipe-desktop-dark.webp#only-dark)
 
 ## Where to start
 
@@ -35,7 +36,8 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 
 ## How it fits together
 
-![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview.svg)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview.svg#only-light)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview-dark.svg#only-dark)
 
 nginx lists the `recipes/` folder as JSON, and the app fetches that listing to find recipes. Dropping a new `.json` file into the folder makes it appear on the next page refresh.
 

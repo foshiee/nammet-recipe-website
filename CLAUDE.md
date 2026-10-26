@@ -30,7 +30,7 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `docs/using-the-service.md` | n/a | Signing in, roles, passwords and what the import service does once running. |
 | `docs/docker.md` | n/a | Running the Docker image: volumes, settings, `REAL_IP_FROM`, updating, releasing. |
 | `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
-| `docs/diagrams/` | n/a | Hand-written SVG diagrams (`overview.svg` in the README, `architecture.svg` in `install.md`). Colours adapt to light/dark via `prefers-color-scheme`. Update them if the request path or the service's write locations change. |
+| `docs/diagrams/` | n/a | Hand-written SVG diagrams (`overview.svg` in the README, `architecture.svg` in `install.md`). Each has a fixed-colour light file and a `-dark.svg` copy (keep both in sync); the README swaps them with `<picture>`, the docs with `#only-light`/`#only-dark`. Update them if the request path or the service's write locations change. |
 | `docs/screenshots/` | n/a | WebP screenshots used by the README, in light and dark versions where the README swaps them by theme. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
 
