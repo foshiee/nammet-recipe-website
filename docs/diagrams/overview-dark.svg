@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 250" role="img" aria-labelledby="t d">
+  <title id="t">How the site fits together</title>
+  <desc id="d">A browser connects over HTTPS to a reverse proxy, which forwards over HTTP to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.</desc>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; fill: #e2e8f0; }
+    .sub { font-size: 12.5px; fill: #94a3b8; }
+    .lbl { font-size: 12.5px; fill: #94a3b8; }
+    .box { fill: #1e293b; stroke: #64748b; stroke-width: 1.5; }
+    .core { fill: #1e3a5f; stroke: #60a5fa; stroke-width: 1.5; }
+    .line { fill: none; stroke: #94a3b8; stroke-width: 1.8; }
+    .head { fill: #94a3b8; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" class="head"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="20" y="97" width="120" height="56" rx="10"/>
+  <text x="80" y="130" text-anchor="middle">Browser</text>
+
+  <path class="line" d="M140,125 H198" marker-end="url(#a)"/>
+  <text class="lbl" x="169" y="115" text-anchor="middle">HTTPS</text>
+
+  <rect class="box" x="200" y="97" width="150" height="56" rx="10"/>
+  <text x="275" y="122" text-anchor="middle">Reverse proxy</text>
+  <text class="sub" x="275" y="140" text-anchor="middle">Traefik, ends HTTPS</text>
+
+  <path class="line" d="M350,125 H408" marker-end="url(#a)"/>
+  <text class="lbl" x="379" y="115" text-anchor="middle">HTTP</text>
+
+  <rect class="core" x="410" y="97" width="110" height="56" rx="10"/>
+  <text x="465" y="122" text-anchor="middle">nginx</text>
+  <text class="sub" x="465" y="140" text-anchor="middle">port 80</text>
+
+  <path class="line" d="M520,125 H560 V52 H608" marker-end="url(#a)"/>
+  <path class="line" d="M520,125 H560 V198 H608" marker-end="url(#a)"/>
+  <text class="lbl" x="568" y="44">/</text>
+  <text class="lbl" x="584" y="218" text-anchor="middle">/api/</text>
+
+  <rect class="box" x="610" y="20" width="210" height="64" rx="10"/>
+  <text x="715" y="48" text-anchor="middle">Static site</text>
+  <text class="sub" x="715" y="68" text-anchor="middle">/var/www/nomnoms</text>
+
+  <rect class="core" x="610" y="166" width="210" height="64" rx="10"/>
+  <text x="715" y="194" text-anchor="middle">Import service (Node)</text>
+  <text class="sub" x="715" y="214" text-anchor="middle">127.0.0.1:3000, optional</text>
+</svg>

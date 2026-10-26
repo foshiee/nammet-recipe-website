@@ -4,7 +4,8 @@ This guide sets up the recipe website on a server: nginx serving the static site
 
 ## How it works
 
-![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nomnoms-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nomnoms, writes recipes, photos and the theme folder under /var/www/nomnoms, and calls api.anthropic.com only when needed.](diagrams/architecture.svg)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nomnoms-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nomnoms, writes recipes, photos and the theme folder under /var/www/nomnoms, and calls api.anthropic.com only when needed.](diagrams/architecture.svg#only-light)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nomnoms-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nomnoms, writes recipes, photos and the theme folder under /var/www/nomnoms, and calls api.anthropic.com only when needed.](diagrams/architecture-dark.svg#only-dark)
 
 How each kind of input is converted, and what isn't supported, is covered in [Using the import service](using-the-service.md#how-imports-are-converted).
 

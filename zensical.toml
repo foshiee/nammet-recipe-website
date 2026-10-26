@@ -14,3 +14,22 @@ nav = [
   { "Using the service" = "using-the-service.md" },
   { "Recipe format" = "recipe-format.md" },
 ]
+
+# Follow the system colour scheme, with a toggle that cycles
+# System -> Light -> Dark like the site's own button.
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
