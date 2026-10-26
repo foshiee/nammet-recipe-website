@@ -1,4 +1,5 @@
 /recipes
+site/
 
 # VS Code: ignore personal settings, keep shareable ones
 .vscode/*
@@ -35,6 +36,7 @@ logs/
 .env.*
 *.pem
 *.key
+.venv/
 
 # Node (import service in opt/nomnoms-api)
 node_modules/

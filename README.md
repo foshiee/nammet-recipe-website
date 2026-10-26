@@ -79,10 +79,8 @@ Editing a saved recipe in the form, with a live preview beside it:
 
 ## How it fits together
 
-```
-browser ──> Reverse Proxy [Traefik] (HTTPS) ──> nginx ──> /var/www/nomnoms      static site and recipe JSON
-                                                       └─> /api/ ──> Node service on 127.0.0.1:3000
-```
+<img src="docs/diagrams/overview.svg" alt="A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.">
+
 
 nginx lists the `recipes/` folder as JSON (`autoindex_format json`), and the app fetches that listing to find recipes. Dropping a new `.json` file into the folder makes it appear on the next page refresh. If you'd rather not use nginx's listing, a `recipes/index.json` holding an array of file names works too.
 

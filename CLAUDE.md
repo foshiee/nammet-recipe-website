@@ -27,8 +27,10 @@ The repo mirrors the target server's filesystem, so paths map 1:1 onto the recip
 | `.github/workflows/docker.yml` | n/a | CI: shellcheck and `npm test`, builds and smoke-tests the image, runs `install.sh` twice on Ubuntu; a `v*` tag publishes the image to `ghcr.io/foshiee/nomnoms-recipe-website` (amd64 + arm64). |
 | `docs/recipe-format.md` | n/a | Authoritative recipe JSON spec. |
 | `docs/install.md` | n/a | Server setup from a fresh Rocky Linux 10 VM (with `install.sh` or by hand), running the import service, and the security checklist. |
+| `docs/using-the-service.md` | n/a | Signing in, roles, passwords and what the import service does once running. |
 | `docs/docker.md` | n/a | Running the Docker image: volumes, settings, `REAL_IP_FROM`, updating, releasing. |
 | `docs/example-recipe.json` | n/a | Example using every field. Duplicate of the copy under `var/www/nomnoms/recipes/`; keep both in sync. |
+| `docs/diagrams/` | n/a | Hand-written SVG diagrams (`overview.svg` in the README, `architecture.svg` in `install.md`). Colours adapt to light/dark via `prefers-color-scheme`. Update them if the request path or the service's write locations change. |
 | `docs/screenshots/` | n/a | WebP screenshots used by the README, in light and dark versions where the README swaps them by theme. |
 | `recipes/` (repo root) | n/a | **Gitignored** (`/recipes` in `.gitignore`). Local working collection of ~39 real recipes. Not committed and not the served folder. |
 
@@ -84,4 +86,5 @@ Node 20+, ES modules, two dependencies (`@anthropic-ai/sdk`, `busboy`). Settings
 - The commented real-IP lines in `nginx-nomnoms.conf` (`# set_real_ip_from 192.0.2.10;`, `# real_ip_header X-Forwarded-For;`, `# real_ip_recursive on;`) and `# include /etc/nginx/cloudflare-ips.inc;` are anchors that `docker/entrypoint.sh` and `install.sh` match exactly to render the config. Change them in all three places together; both scripts fail loudly if an anchor is missing.
 - The Dockerfile's `ENV` mirrors the paths and defaults in `api.env.example`; keep them in sync.
 - A new file served from `var/www/nomnoms/` must be added to the `install` line in `install.sh`, the Dockerfile's `COPY` and step 6 of `docs/install.md`.
+- `README.md` (the GitHub front page) and `docs/index.md` (the Zensical docs site home) overlap: intro, features and the architecture diagram. When you change one, update the other. New pages in `docs/` also need adding to `nav` in `zensical.toml`.
 - Docs describe a fresh, valid install of the current layout. Don't add upgrade or migration steps (old paths, renamed files, backing up previous configs); if a change affects an existing server, say so in the commit message or to the user instead.

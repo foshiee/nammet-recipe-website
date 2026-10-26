@@ -1,0 +1,16 @@
+[project]
+site_name = "Nomnoms Recipe Website"
+site_description = "A self-hosted recipe website: plain JSON recipes, a vanilla JavaScript front end and nginx."
+site_url = "https://foshiee.github.io/nomnoms-recipe-website/"
+repo_url = "https://github.com/foshiee/nomnoms-recipe-website"
+docs_dir = "docs"
+site_dir = "site"
+
+# Keep this list in step with the files in docs/ (see CLAUDE.md).
+nav = [
+  { "Home" = "index.md" },
+  { "Install" = "install.md" },
+  { "Docker" = "docker.md" },
+  { "Using the service" = "using-the-service.md" },
+  { "Recipe format" = "recipe-format.md" },
+]

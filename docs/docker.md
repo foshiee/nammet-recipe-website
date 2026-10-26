@@ -6,7 +6,7 @@ Like the VM install, it serves plain HTTP and expects an HTTPS reverse proxy, su
 
 ## Quick start
 
-With Docker Compose, copy [docker-compose.yml](../docker-compose.yml) from the repo into an empty folder, then:
+With Docker Compose, copy [docker-compose.yml](https://github.com/foshiee/nomnoms-recipe-website/blob/master/docker-compose.yml) from the repo into an empty folder, then:
 
 ```sh
 docker compose up -d
@@ -77,7 +77,7 @@ Set these with `-e` or under `environment:` in the compose file.
 | `SESSION_HOURS` | `168` | How long a sign-in lasts. |
 | `MAX_UPLOAD_MB`, `MAX_FETCH_MB` | `20`, `5` | Size limits for uploads and fetched web pages. |
 
-The other variables in [api.env.example](../etc/nomnoms/api.env.example) are set by the image and shouldn't need changing.
+The other variables in [api.env.example](https://github.com/foshiee/nomnoms-recipe-website/blob/master/etc/nomnoms/api.env.example) are set by the image and shouldn't need changing.
 
 ## Behind a reverse proxy
 
