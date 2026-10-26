@@ -4,6 +4,8 @@ A self-hosted recipe website for one household or a small group. Recipes are pla
 
 An optional Node service adds sign-in, recipe import (from a file, a web page or pasted text), adding recipes in a form, and an admin page. Without it, the site still browses and cooks.
 
+**Documentation:** <https://foshiee.github.io/nomnoms-recipe-website/>
+
 ## Screenshots
 
 The light and dark shots follow your GitHub theme, as the site follows your system's unless you pick one.
