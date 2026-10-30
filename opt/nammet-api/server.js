@@ -1,7 +1,7 @@
 // nammet API: login, recipe import and the admin page for the static recipe site.
 // nginx proxies /api/ here; everything else is still served by nginx directly.
 //
-//   GET  /api/me        -> { user } (null when signed out)
+//   GET  /api/me        -> { user, demo, demoHint } (user is null when signed out)
 //   POST /api/login     { username, password }
 //   POST /api/logout
 //   POST /api/password  { current, password }   any signed-in user choosing their own password
@@ -31,6 +31,8 @@
 //   POST /api/admin/users/update   { username, role?, password? }
 //   POST /api/admin/users/delete   { username }
 //
+// With DEMO_MODE on, the routes listed in demo.js give 403 to signed-in users.
+//
 // Every POST must carry the header "X-Requested-With: nammet". Browsers won't
 // send a custom header cross-site without a CORS preflight, which this server
 // never approves, so this together with SameSite=Strict cookies blocks CSRF.
@@ -47,6 +49,7 @@ import { testKey, LlmError } from './import/llm.js';
 import { validateRecipe } from './import/validate.js';
 import { readRecipeFile, saveRecipe, SaveError } from './save.js';
 import * as photos from './photos.js';
+import { demoBlocked } from './demo.js';
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -182,7 +185,7 @@ const MAX_IMPORTS = 4;
 const routes = {
   'GET /api/me': async (req, res) => {
     const s = currentUser(req);
-    send(res, 200, { user: s ? auth.publicUser(s) : null });
+    send(res, 200, { user: s ? auth.publicUser(s) : null, demo: config.demo, demoHint: config.demoHint });
   },
 
   'POST /api/login': async (req, res) => {
@@ -290,7 +293,10 @@ const routes = {
 
   'POST /api/admin/appearance': async (req, res) => {
     const user = requireAdmin(req);
-    await settings.saveAppearance(await readJson(req, 64 * 1024));
+    const input = await readJson(req, 64 * 1024);
+    // The demo's visitors can change the look, but not put their own words on it
+    if (config.demo) Object.assign(input, { siteName: settings.appearance().siteName, favicon: settings.appearance().favicon });
+    await settings.saveAppearance(input);
     console.log(`admin ${user.username}: changed the appearance`);
     send(res, 200, adminSettings());
   },
@@ -404,6 +410,10 @@ const server = http.createServer(async (req, res) => {
     const handler = routes[`${req.method} ${pathname}`];
     if (!handler) throw new HttpError(404, 'Not found.');
     if (req.method === 'POST' && req.headers['x-requested-with'] !== 'nammet') throw new HttpError(403, 'Missing request header.');
+    if (demoBlocked(`${req.method} ${pathname}`)) {
+      if (!currentUser(req)) throw new HttpError(401, 'Please sign in.');
+      throw new HttpError(403, 'Disabled in the demo.');
+    }
     await handler(req, res);
   } catch (e) {
     const known = [HttpError, ImportError, SaveError, LlmError, settings.SettingsError, auth.UserError, photos.PhotoError];
@@ -420,6 +430,7 @@ server.listen(config.port, config.host, () => {
   console.log(`nammet-api listening on http://${config.host}:${config.port}`);
   console.log(`recipes: ${path.resolve(config.recipesDir)}  photos: ${path.resolve(config.photosDir)}  users: ${path.resolve(config.usersFile)}`);
   console.log(`settings: ${path.resolve(config.settingsFile)}  theme: ${path.resolve(config.themeDir)}`);
+  if (config.demo) console.log('Demo mode: saving recipes and photos, the site name and icon, users, passwords, the API key and the model are read-only.');
   if (config.devStaticRoot) console.log(`dev mode: also serving ${path.resolve(config.devStaticRoot)}`);
   if (!settings.keyStatus().set) console.log('No Anthropic API key is set: PDF, photo and plain-text imports are disabled until one is added.');
 });

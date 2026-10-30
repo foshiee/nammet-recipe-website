@@ -38,6 +38,11 @@ export const config = {
   effort: env.EFFORT || 'medium',
   aiFallbacks: bool(env.AI_FALLBACKS, true),
 
+  // Public demo with a shared admin login: turns off the routes in demo.js. DEMO_HINT is
+  // plain text shown on the sign-in screen (for example the demo login), so it's public.
+  demo: bool(env.DEMO_MODE, false),
+  demoHint: (env.DEMO_HINT || '').slice(0, 200),
+
   // Local testing only: serve the static site from this folder as well, so no nginx is needed.
   devStaticRoot: env.DEV_STATIC_ROOT || ''
 };
