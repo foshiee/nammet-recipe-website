@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090 340" role="img" aria-labelledby="t d">
   <title id="t">Request flow and what the import service writes</title>
-  <desc id="d">A browser connects over HTTPS to a reverse proxy, which forwards over HTTP to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the nomnoms-api Node service on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nomnoms, writes recipe files, photos and the theme folder under /var/www/nomnoms, and calls api.anthropic.com only when needed.</desc>
+  <desc id="d">A browser connects over HTTPS to a reverse proxy, which forwards over HTTP to nginx on port 80. nginx serves the static site from /var/www/nammet and proxies /api/ to the nammet-api Node service on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nammet, writes recipe files, photos and the theme folder under /var/www/nammet, and calls api.anthropic.com only when needed.</desc>
   <style>
     text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; fill: #e2e8f0; }
     .sub { font-size: 12.5px; fill: #94a3b8; }
@@ -45,10 +45,10 @@
 
   <rect class="box" x="540" y="56" width="220" height="64" rx="10"/>
   <text x="650" y="84" text-anchor="middle">Static site</text>
-  <text class="sub" x="650" y="104" text-anchor="middle">/var/www/nomnoms</text>
+  <text class="sub" x="650" y="104" text-anchor="middle">/var/www/nammet</text>
 
   <rect class="core" x="540" y="164" width="220" height="64" rx="10"/>
-  <text x="650" y="192" text-anchor="middle">nomnoms-api (Node)</text>
+  <text x="650" y="192" text-anchor="middle">nammet-api (Node)</text>
   <text class="sub" x="650" y="212" text-anchor="middle">127.0.0.1:3000 only</text>
 
   <!-- Service outputs -->
@@ -61,15 +61,15 @@
 
   <rect class="store" x="830" y="30" width="240" height="44" rx="10"/>
   <text x="950" y="50" text-anchor="middle">users.json, settings.json</text>
-  <text class="sub" x="950" y="66" text-anchor="middle">/var/lib/nomnoms</text>
+  <text class="sub" x="950" y="66" text-anchor="middle">/var/lib/nammet</text>
 
   <rect class="store" x="830" y="86" width="240" height="44" rx="10"/>
   <text x="950" y="106" text-anchor="middle">recipes/&lt;name&gt;.json</text>
-  <text class="sub" x="950" y="122" text-anchor="middle">/var/www/nomnoms</text>
+  <text class="sub" x="950" y="122" text-anchor="middle">/var/www/nammet</text>
 
   <rect class="store" x="830" y="142" width="240" height="44" rx="10"/>
   <text x="950" y="162" text-anchor="middle">photos/&lt;name&gt;-&lt;hash&gt;.jpg</text>
-  <text class="sub" x="950" y="178" text-anchor="middle">/var/www/nomnoms</text>
+  <text class="sub" x="950" y="178" text-anchor="middle">/var/www/nammet</text>
 
   <rect class="store" x="830" y="198" width="240" height="44" rx="10"/>
   <text x="950" y="218" text-anchor="middle">theme/</text>

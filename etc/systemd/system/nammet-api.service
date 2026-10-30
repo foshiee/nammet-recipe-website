@@ -1,16 +1,16 @@
-# Save as /etc/systemd/system/nomnoms-api.service on the recipe VM
+# Save as /etc/systemd/system/nammet-api.service on the recipe VM
 [Unit]
-Description=nomnoms recipe import API
+Description=nammet recipe import API
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=nomnoms
-Group=nomnoms
-WorkingDirectory=/opt/nomnoms-api
-EnvironmentFile=/etc/nomnoms/api.env
-ExecStart=/usr/bin/node /opt/nomnoms-api/server.js
+User=nammet
+Group=nammet
+WorkingDirectory=/opt/nammet-api
+EnvironmentFile=/etc/nammet/api.env
+ExecStart=/usr/bin/node /opt/nammet-api/server.js
 Restart=on-failure
 RestartSec=5
 
@@ -18,7 +18,7 @@ RestartSec=5
 # generated theme files, and its own data folder (users and admin-page settings)
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/www/nomnoms/recipes /var/www/nomnoms/photos /var/www/nomnoms/theme /var/lib/nomnoms
+ReadWritePaths=/var/www/nammet/recipes /var/www/nammet/photos /var/www/nammet/theme /var/lib/nammet
 ProtectHome=true
 PrivateTmp=true
 PrivateDevices=true

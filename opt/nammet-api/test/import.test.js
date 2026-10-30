@@ -127,7 +127,7 @@ test('slugs', () => {
 });
 
 test('save refuses to overwrite unless asked', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nomnoms-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nammet-'));
   try {
     await saveRecipe('toast', { title: 'Toast', steps: ['Toast it.'] }, { dir });
     await assert.rejects(saveRecipe('toast', { title: 'Toast 2' }, { dir }), (e) => e.status === 409);

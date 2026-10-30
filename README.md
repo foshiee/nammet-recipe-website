@@ -1,10 +1,10 @@
-# Nomnoms Recipe Website
+# Nammet Recipe Website
 
 A self-hosted recipe website for one household or a small group. Recipes are plain JSON files in a folder, the front end is a single HTML page with vanilla JavaScript and CSS, and nginx serves the lot. There is no database, no build step and no front-end dependencies.
 
 An optional Node service adds sign-in, recipe import (from a file, a web page or pasted text), adding recipes in a form, and an admin page. Without it, the site still browses and cooks.
 
-**Documentation:** <https://foshiee.github.io/nomnoms-recipe-website/>
+**Documentation:** <https://foshiee.github.io/nammet-recipe-website/>
 
 ## Screenshots
 
@@ -83,28 +83,28 @@ Editing a saved recipe in the form, with a live preview beside it:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/overview-dark.svg">
-  <img src="docs/diagrams/overview.svg" alt="A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.">
+  <img src="docs/diagrams/overview.svg" alt="A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nammet and proxies /api/ to the Node import service on 127.0.0.1:3000.">
 </picture>
 
 
 nginx lists the `recipes/` folder as JSON (`autoindex_format json`), and the app fetches that listing to find recipes. Dropping a new `.json` file into the folder makes it appear on the next page refresh. If you'd rather not use nginx's listing, a `recipes/index.json` holding an array of file names works too.
 
-The repo mirrors the server's filesystem, so `var/www/nomnoms/` deploys to `/var/www/nomnoms/`, `opt/nomnoms-api/` to `/opt/nomnoms-api/`, and so on.
+The repo mirrors the server's filesystem, so `var/www/nammet/` deploys to `/var/www/nammet/`, `opt/nammet-api/` to `/opt/nammet-api/`, and so on.
 
 | Path | What it is |
 |---|---|
-| `var/www/nomnoms/` | The website: `index.html`, `app.js`, `style.css`, `recipes/`, `photos/` |
-| `opt/nomnoms-api/` | The optional Node service (Node 20+, two dependencies) |
+| `var/www/nammet/` | The website: `index.html`, `app.js`, `style.css`, `recipes/`, `photos/` |
+| `opt/nammet-api/` | The optional Node service (Node 20+, two dependencies) |
 | `etc/nginx/` | nginx config, including rate limits and an AI-crawler block |
 | `etc/systemd/system/` | systemd unit for the service, sandboxed to the folders it writes |
-| `etc/nomnoms/api.env.example` | Service settings template |
+| `etc/nammet/api.env.example` | Service settings template |
 | `docs/` | Recipe format spec, server setup guide and an example recipe |
 
 ## Quick start
 
 ### Just the website
 
-Copy `var/www/nomnoms/` to any web server that can return a JSON directory listing for `recipes/` (the included nginx config does this), or add a `recipes/index.json`:
+Copy `var/www/nammet/` to any web server that can return a JSON directory listing for `recipes/` (the included nginx config does this), or add a `recipes/index.json`:
 
 ```json
 ["example-recipe.json", "garlic-tomato-spaghetti.json"]
@@ -128,13 +128,13 @@ Then write recipes by hand following [docs/recipe-format.md](docs/recipe-format.
 The service can serve the site itself and emulate nginx's folder listing, so you don't need nginx on your own machine:
 
 ```sh
-cd opt/nomnoms-api
+cd opt/nammet-api
 npm install
 USERS_FILE=./dev-users.json node tools/add-user.js tester --role admin --permanent
-mkdir -p ../../var/www/nomnoms/theme
-USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nomnoms/theme \
-  RECIPES_DIR=../../var/www/nomnoms/recipes PHOTOS_DIR=../../var/www/nomnoms/photos \
-  DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
+mkdir -p ../../var/www/nammet/theme
+USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nammet/theme \
+  RECIPES_DIR=../../var/www/nammet/recipes PHOTOS_DIR=../../var/www/nammet/photos \
+  DEV_STATIC_ROOT=../../var/www/nammet COOKIE_SECURE=false node server.js
 ```
 
 `add-user.js` asks for a password. Open http://127.0.0.1:3000 and sign in as `tester` with it. On PowerShell, set each variable with `$env:USERS_FILE = "./dev-users.json"` and so on.
@@ -145,7 +145,7 @@ Run the service's tests with `npm test`. They use Node's built-in test runner an
 
 Three ways, all expecting an HTTPS reverse proxy such as Traefik in front:
 
-- **Docker:** `ghcr.io/foshiee/nomnoms-recipe-website` holds nginx and the import service in one image. See [docs/docker.md](docs/docker.md).
+- **Docker:** `ghcr.io/foshiee/nammet-recipe-website` holds nginx and the import service in one image. See [docs/docker.md](docs/docker.md).
 - **install.sh:** on a RHEL-family or Debian/Ubuntu server, clone the repo and run `./install.sh`. Run it again after `git pull` to update. See [Quick install](docs/install.md#quick-install-with-installsh).
 - **By hand:** [docs/install.md](docs/install.md) walks through a full install on a fresh Rocky Linux 10 VM: packages, the service account, systemd, SELinux, nginx, and a security checklist for running behind Traefik. It also covers what Claude imports cost.
 
@@ -172,7 +172,7 @@ nginx returns 403 to known AI crawlers and scraping libraries, and `robots.txt` 
 
 ## Support
 
-Nomnoms Recipe Website is free, and you can use it however you like. If it's earned a place in your kitchen, you can [buy me a pint🍺 on Ko-fi](https://ko-fi.com/foshiee).
+Nammet Recipe Website is free, and you can use it however you like. If it's earned a place in your kitchen, you can [buy me a pint🍺 on Ko-fi](https://ko-fi.com/foshiee).
 
 ## License
 

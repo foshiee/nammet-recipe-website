@@ -1,4 +1,4 @@
-# Nomnoms Recipe Website
+# Nammet Recipe Website
 
 A self-hosted recipe website for one household or a small group. Recipes are plain JSON files in a folder, the front end is a single HTML page with vanilla JavaScript and CSS, and nginx serves the lot. There is no database, no build step and no front-end dependencies.
 
@@ -36,11 +36,11 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 
 ## How it fits together
 
-![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview.svg#only-light)
-![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview-dark.svg#only-dark)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nammet and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview.svg#only-light)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site from /var/www/nammet and proxies /api/ to the Node import service on 127.0.0.1:3000.](diagrams/overview-dark.svg#only-dark)
 
 nginx lists the `recipes/` folder as JSON, and the app fetches that listing to find recipes. Dropping a new `.json` file into the folder makes it appear on the next page refresh.
 
 ## Source and support
 
-The code is on [GitHub](https://github.com/foshiee/nomnoms-recipe-website) under the MIT License. If the site has earned a place in your kitchen, you can [buy me a pint on Ko-fi](https://ko-fi.com/foshiee).
+The code is on [GitHub](https://github.com/foshiee/nammet-recipe-website) under the MIT License. If the site has earned a place in your kitchen, you can [buy me a pint on Ko-fi](https://ko-fi.com/foshiee).

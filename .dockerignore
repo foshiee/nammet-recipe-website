@@ -5,4 +5,4 @@
 docs/
 **/node_modules
 **/dev-*.json
-var/www/nomnoms/theme
+var/www/nammet/theme

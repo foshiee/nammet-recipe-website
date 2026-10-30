@@ -1,5 +1,5 @@
 // All settings come from the environment. On the VM they are set in
-// /etc/nomnoms/api.env, which systemd loads (see nomnoms-api.service).
+// /etc/nammet/api.env, which systemd loads (see nammet-api.service).
 
 const env = process.env;
 
@@ -10,15 +10,15 @@ export const config = {
   host: env.HOST || '127.0.0.1',
   port: num(env.PORT, 3000),
 
-  recipesDir: env.RECIPES_DIR || '/var/www/nomnoms/recipes',
+  recipesDir: env.RECIPES_DIR || '/var/www/nammet/recipes',
   // Public folder for recipe photos uploaded through the site (see photos.js)
-  photosDir: env.PHOTOS_DIR || '/var/www/nomnoms/photos',
-  usersFile: env.USERS_FILE || '/var/lib/nomnoms/users.json',
+  photosDir: env.PHOTOS_DIR || '/var/www/nammet/photos',
+  usersFile: env.USERS_FILE || '/var/lib/nammet/users.json',
 
   // Admin page settings (appearance, Claude key/model/effort), and the public folder
   // the service writes the generated theme.css, site.json and favicon into.
-  settingsFile: env.SETTINGS_FILE || '/var/lib/nomnoms/settings.json',
-  themeDir: env.THEME_DIR || '/var/www/nomnoms/theme',
+  settingsFile: env.SETTINGS_FILE || '/var/lib/nammet/settings.json',
+  themeDir: env.THEME_DIR || '/var/www/nammet/theme',
 
   // TLS ends at Traefik, so the service can't tell whether the browser used HTTPS.
   // Keep this on in production; turn it off only for local testing over plain http.

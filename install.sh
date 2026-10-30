@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the site and the import service from this clone, following docs/install.md.
 # Run it again after `git pull --ff-only` to update. It never touches your recipes,
-# photos, users, settings or an existing /etc/nomnoms/api.env.
+# photos, users, settings or an existing /etc/nammet/api.env.
 #
 #   ./install.sh [--proxy ADDR[,ADDR]] [--cloudflare | --no-cloudflare] [--admin NAME | --no-admin] [--yes]
 #
@@ -12,7 +12,7 @@ usage() {
   cat <<'EOF'
 Usage: ./install.sh [options]
 
-Installs or updates the nomnoms site and import service on this machine.
+Installs or updates the nammet site and import service on this machine.
 Run it from the cloned repo as your normal user; it asks for sudo.
 
   --proxy ADDR[,ADDR]  The reverse proxy's IP address or CIDR range (Traefik, for
@@ -91,9 +91,9 @@ REPO=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 case "$REPO/" in
   /var/www/*) die "the repo is under /var/www, where nginx could serve it. Clone it into your home directory instead." ;;
 esac
-for f in var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css var/www/nomnoms/robots.txt \
-         opt/nomnoms-api/server.js opt/nomnoms-api/package-lock.json etc/nginx/conf.d/nginx-nomnoms.conf \
-         etc/nginx/nginx.conf etc/systemd/system/nomnoms-api.service etc/nomnoms/api.env.example; do
+for f in var/www/nammet/index.html var/www/nammet/app.js var/www/nammet/style.css var/www/nammet/robots.txt \
+         opt/nammet-api/server.js opt/nammet-api/package-lock.json etc/nginx/conf.d/nginx-nammet.conf \
+         etc/nginx/nginx.conf etc/systemd/system/nammet-api.service etc/nammet/api.env.example; do
   [ -f "$REPO/$f" ] || die "$f is missing. Run this from a complete clone of the repo."
 done
 
@@ -108,7 +108,7 @@ esac
 command -v systemctl >/dev/null || die "systemd is needed."
 
 UPDATE=0
-[ -f /opt/nomnoms-api/server.js ] && UPDATE=1
+[ -f /opt/nammet-api/server.js ] && UPDATE=1
 if [ "$UPDATE" = 1 ]; then echo "Updating the existing install ($FAMILY family)."; else echo "Installing ($FAMILY family)."; fi
 
 ### 2. Packages
@@ -150,50 +150,50 @@ note "Node.js $(/usr/bin/node --version)"
 ### 3. Service account and folders
 
 step "Service account and folders"
-if ! id nomnoms >/dev/null 2>&1; then
-  useradd --system --home-dir /var/lib/nomnoms --shell "$(command -v nologin || echo /sbin/nologin)" nomnoms
-  note "Created the nomnoms account"
+if ! id nammet >/dev/null 2>&1; then
+  useradd --system --home-dir /var/lib/nammet --shell "$(command -v nologin || echo /sbin/nologin)" nammet
+  note "Created the nammet account"
 fi
-install -d -m 0700 -o nomnoms -g nomnoms /var/lib/nomnoms
-install -d -m 0755 /var/www/nomnoms /var/www/nomnoms/recipes
-install -d -m 0755 -o nomnoms -g nomnoms /var/www/nomnoms/theme /var/www/nomnoms/photos
+install -d -m 0700 -o nammet -g nammet /var/lib/nammet
+install -d -m 0755 /var/www/nammet /var/www/nammet/recipes
+install -d -m 0755 -o nammet -g nammet /var/www/nammet/theme /var/www/nammet/photos
 
 ### 4. Site files
 
 step "Website"
-install -m 0644 "$REPO"/var/www/nomnoms/{index.html,app.js,style.css,robots.txt} /var/www/nomnoms/
-if [ "$UPDATE" = 0 ] && ! compgen -G '/var/www/nomnoms/recipes/*.json' >/dev/null; then
-  install -m 0644 "$REPO/var/www/nomnoms/recipes/example-recipe.json" /var/www/nomnoms/recipes/
-  install -m 0644 "$REPO/var/www/nomnoms/photos/example-recipe.jpg" /var/www/nomnoms/photos/
+install -m 0644 "$REPO"/var/www/nammet/{index.html,app.js,style.css,robots.txt} /var/www/nammet/
+if [ "$UPDATE" = 0 ] && ! compgen -G '/var/www/nammet/recipes/*.json' >/dev/null; then
+  install -m 0644 "$REPO/var/www/nammet/recipes/example-recipe.json" /var/www/nammet/recipes/
+  install -m 0644 "$REPO/var/www/nammet/photos/example-recipe.jpg" /var/www/nammet/photos/
   note "Added the example recipe"
 fi
-if command -v restorecon >/dev/null; then restorecon -R /var/www/nomnoms; fi
+if command -v restorecon >/dev/null; then restorecon -R /var/www/nammet; fi
 
 ### 5. Service code
 
 step "Import service"
 # Built beside the running copy and swapped in only once npm has succeeded
-rm -rf /opt/nomnoms-api.new /opt/nomnoms-api.old
-cp -r "$REPO/opt/nomnoms-api" /opt/nomnoms-api.new
-rm -rf /opt/nomnoms-api.new/node_modules /opt/nomnoms-api.new/dev-*.json
-chown -R root:root /opt/nomnoms-api.new
-chmod -R u+rwX,go+rX,go-w /opt/nomnoms-api.new
-(cd /opt/nomnoms-api.new && npm ci --omit=dev --no-audit --no-fund --loglevel=error) \
-  || { rm -rf /opt/nomnoms-api.new; die "npm ci failed; the installed service was left as it was."; }
-if [ -d /opt/nomnoms-api ]; then mv /opt/nomnoms-api /opt/nomnoms-api.old; fi
-mv /opt/nomnoms-api.new /opt/nomnoms-api
-rm -rf /opt/nomnoms-api.old
+rm -rf /opt/nammet-api.new /opt/nammet-api.old
+cp -r "$REPO/opt/nammet-api" /opt/nammet-api.new
+rm -rf /opt/nammet-api.new/node_modules /opt/nammet-api.new/dev-*.json
+chown -R root:root /opt/nammet-api.new
+chmod -R u+rwX,go+rX,go-w /opt/nammet-api.new
+(cd /opt/nammet-api.new && npm ci --omit=dev --no-audit --no-fund --loglevel=error) \
+  || { rm -rf /opt/nammet-api.new; die "npm ci failed; the installed service was left as it was."; }
+if [ -d /opt/nammet-api ]; then mv /opt/nammet-api /opt/nammet-api.old; fi
+mv /opt/nammet-api.new /opt/nammet-api
+rm -rf /opt/nammet-api.old
 
 ### 6. Let the service write recipes
 
-setfacl -m u:nomnoms:rwx /var/www/nomnoms/recipes
+setfacl -m u:nammet:rwx /var/www/nammet/recipes
 
 ### 7. api.env
 
 step "Configuration"
-install -d -m 0750 -o root -g nomnoms /etc/nomnoms
-if [ -f /etc/nomnoms/api.env ]; then
-  note "Kept /etc/nomnoms/api.env"
+install -d -m 0750 -o root -g nammet /etc/nammet
+if [ -f /etc/nammet/api.env ]; then
+  note "Kept /etc/nammet/api.env"
 else
   KEY=
   if [ "$INTERACTIVE" = 1 ]; then
@@ -204,20 +204,20 @@ else
     KEY=$(printf '%s' "$KEY" | tr -d '[:space:]')
   fi
   (umask 077 && KEY="$KEY" awk '/^ANTHROPIC_API_KEY=/ { print "ANTHROPIC_API_KEY=" ENVIRON["KEY"]; next } { print }' \
-    "$REPO/etc/nomnoms/api.env.example" > /etc/nomnoms/api.env)
+    "$REPO/etc/nammet/api.env.example" > /etc/nammet/api.env)
   unset KEY
-  chown root:nomnoms /etc/nomnoms/api.env
-  chmod 0640 /etc/nomnoms/api.env
-  note "Created /etc/nomnoms/api.env"
+  chown root:nammet /etc/nammet/api.env
+  chmod 0640 /etc/nammet/api.env
+  note "Created /etc/nammet/api.env"
 fi
 
 ### 8. systemd
 
 step "Starting the service"
-install -m 0644 "$REPO/etc/systemd/system/nomnoms-api.service" /etc/systemd/system/
+install -m 0644 "$REPO/etc/systemd/system/nammet-api.service" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --quiet nomnoms-api
-systemctl restart nomnoms-api
+systemctl enable --quiet nammet-api
+systemctl restart nammet-api
 
 ### 9. SELinux
 
@@ -229,7 +229,7 @@ fi
 ### 10. nginx
 
 step "nginx"
-SITE=/etc/nginx/conf.d/nomnoms.conf
+SITE=/etc/nginx/conf.d/nammet.conf
 if [ "$PROXY_SET" = 0 ] && [ -f "$SITE" ]; then
   PROXY=$(awk '$1 == "set_real_ip_from" { sub(/;$/, "", $2); print $2 }' "$SITE" | paste -sd, -)
 fi
@@ -248,7 +248,7 @@ if [ -z "$PROXY" ] && [ "$UPDATE" = 0 ] && [ "$PROXY_SET" = 0 ] && [ "$INTERACTI
 fi
 PROXY=$(clean_addrs "$PROXY")
 
-TEMPLATE="$REPO/etc/nginx/conf.d/nginx-nomnoms.conf"
+TEMPLATE="$REPO/etc/nginx/conf.d/nginx-nammet.conf"
 for line in '# set_real_ip_from 192.0.2.10;' '# real_ip_header X-Forwarded-For;' '# real_ip_recursive on;' \
             '# include /etc/nginx/cloudflare-ips.inc;'; do
   grep -qF "$line" "$TEMPLATE" || die "the nginx config no longer has the line '$line'."
@@ -356,13 +356,13 @@ fi
 
 ### 12. First admin
 
-USERS_FILE=/var/lib/nomnoms/users.json
+USERS_FILE=/var/lib/nammet/users.json
 has_users() {
   [ -s "$USERS_FILE" ] && /usr/bin/node -e \
     'const u = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.exit(Array.isArray(u) && u.length ? 0 : 1)' \
     "$USERS_FILE" 2>/dev/null
 }
-ADD_USER_CMD="cd /opt/nomnoms-api && sudo -u nomnoms USERS_FILE=$USERS_FILE node tools/add-user.js yourname --role admin"
+ADD_USER_CMD="cd /opt/nammet-api && sudo -u nammet USERS_FILE=$USERS_FILE node tools/add-user.js yourname --role admin"
 if [ "$NO_ADMIN" = 0 ] && ! has_users; then
   step "First admin"
   if [ -z "$ADMIN" ] && [ "$INTERACTIVE" = 1 ]; then
@@ -370,7 +370,7 @@ if [ "$NO_ADMIN" = 0 ] && ! has_users; then
   fi
   if [ -n "$ADMIN" ]; then
     echo "Passwords need at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. This one is temporary: you'll choose your own at your first sign-in."
-    (cd /opt/nomnoms-api && sudo -u nomnoms USERS_FILE="$USERS_FILE" /usr/bin/node tools/add-user.js "$ADMIN" --role admin) \
+    (cd /opt/nammet-api && sudo -u nammet USERS_FILE="$USERS_FILE" /usr/bin/node tools/add-user.js "$ADMIN" --role admin) \
       || note "Creating the admin failed. Try again with: $ADD_USER_CMD"
   else
     note "No users yet. Create the first admin with:"
@@ -386,7 +386,7 @@ for _ in $(seq 1 15); do
   if curl -fsS --max-time 3 http://127.0.0.1:3000/api/me >/dev/null 2>&1; then ok=1; break; fi
   sleep 1
 done
-if [ "$ok" = 1 ]; then note "Service: running"; else note "Service: NOT answering. See: journalctl -u nomnoms-api -e"; fi
+if [ "$ok" = 1 ]; then note "Service: running"; else note "Service: NOT answering. See: journalctl -u nammet-api -e"; fi
 if curl -fsS --max-time 5 http://127.0.0.1/recipes/ 2>/dev/null | grep -q '"type"'; then
   note "nginx: serving the recipe list"
 else
@@ -396,9 +396,9 @@ fi
 if [ "$UPDATE" = 1 ]; then step "Updated"; else step "Installed"; fi
 cat <<EOF
     The site is on port 80 of this machine. Put an HTTPS reverse proxy in front of it:
-    sign-in only works over HTTPS while COOKIE_SECURE=true in /etc/nomnoms/api.env.
+    sign-in only works over HTTPS while COOKIE_SECURE=true in /etc/nammet/api.env.
     Go through the security checklist in docs/install.md.
-    Service log: journalctl -u nomnoms-api -f
+    Service log: journalctl -u nammet-api -f
     To update later: git pull --ff-only && ./install.sh
 EOF
 if [ -z "$PROXY" ] && [ "$CLOUDFLARE" = 0 ]; then

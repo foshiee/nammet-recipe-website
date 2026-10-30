@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please don't open a public issue for a security problem. Report it privately through GitHub instead: on the repo's **Security** tab, choose **Report a vulnerability**, or go straight to [the private report form](https://github.com/foshiee/nomnoms-recipe-website/security/advisories/new). Only the maintainer can see it.
+Please don't open a public issue for a security problem. Report it privately through GitHub instead: on the repo's **Security** tab, choose **Report a vulnerability**, or go straight to [the private report form](https://github.com/foshiee/nammet-recipe-website/security/advisories/new). Only the maintainer can see it.
 
 A useful report says:
 
@@ -18,8 +18,8 @@ Only the latest commit on `master` and the latest published Docker image are sup
 
 ## In scope
 
-- The import service (`opt/nomnoms-api`): sign-in, sessions, roles and the rate limits; the admin and import routes; fetching web addresses (it should refuse private and internal addresses); file uploads; and where it writes files.
-- The front end (`var/www/nomnoms`): for example, recipe data or admin settings that can run script in a visitor's browser.
+- The import service (`opt/nammet-api`): sign-in, sessions, roles and the rate limits; the admin and import routes; fetching web addresses (it should refuse private and internal addresses); file uploads; and where it writes files.
+- The front end (`var/www/nammet`): for example, recipe data or admin settings that can run script in a visitor's browser.
 - The nginx and systemd configuration in `etc/`, when it's installed as described in [docs/install.md](docs/install.md).
 - `install.sh`, and the Docker image (`Dockerfile`, `docker/`) run as described in [docs/docker.md](docs/docker.md).
 

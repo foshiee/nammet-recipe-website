@@ -1,4 +1,4 @@
-// nomnoms API: login, recipe import and the admin page for the static recipe site.
+// nammet API: login, recipe import and the admin page for the static recipe site.
 // nginx proxies /api/ here; everything else is still served by nginx directly.
 //
 //   GET  /api/me        -> { user } (null when signed out)
@@ -31,7 +31,7 @@
 //   POST /api/admin/users/update   { username, role?, password? }
 //   POST /api/admin/users/delete   { username }
 //
-// Every POST must carry the header "X-Requested-With: nomnoms". Browsers won't
+// Every POST must carry the header "X-Requested-With: nammet". Browsers won't
 // send a custom header cross-site without a CORS preflight, which this server
 // never approves, so this together with SameSite=Strict cookies blocks CSRF.
 
@@ -403,7 +403,7 @@ const server = http.createServer(async (req, res) => {
     }
     const handler = routes[`${req.method} ${pathname}`];
     if (!handler) throw new HttpError(404, 'Not found.');
-    if (req.method === 'POST' && req.headers['x-requested-with'] !== 'nomnoms') throw new HttpError(403, 'Missing request header.');
+    if (req.method === 'POST' && req.headers['x-requested-with'] !== 'nammet') throw new HttpError(403, 'Missing request header.');
     await handler(req, res);
   } catch (e) {
     const known = [HttpError, ImportError, SaveError, LlmError, settings.SettingsError, auth.UserError, photos.PhotoError];
@@ -417,7 +417,7 @@ await settings.loadSettings();
 
 server.requestTimeout = 120_000;
 server.listen(config.port, config.host, () => {
-  console.log(`nomnoms-api listening on http://${config.host}:${config.port}`);
+  console.log(`nammet-api listening on http://${config.host}:${config.port}`);
   console.log(`recipes: ${path.resolve(config.recipesDir)}  photos: ${path.resolve(config.photosDir)}  users: ${path.resolve(config.usersFile)}`);
   console.log(`settings: ${path.resolve(config.settingsFile)}  theme: ${path.resolve(config.themeDir)}`);
   if (config.devStaticRoot) console.log(`dev mode: also serving ${path.resolve(config.devStaticRoot)}`);

@@ -4,7 +4,7 @@ Each recipe on the site is one JSON file in the `recipes/` folder. The site list
 
 ## File location and naming
 
-Recipe files go in `/var/www/nomnoms/recipes/` on the web server. A new file shows up after a page refresh; nginx does not need a reload.
+Recipe files go in `/var/www/nammet/recipes/` on the web server. A new file shows up after a page refresh; nginx does not need a reload.
 
 You can also sign in (link at the bottom of the home page) and use the **Add recipe** button. It converts a recipe file, web page, PDF, photo or pasted text into this format, or gives you an empty form to fill in, lets you check and edit the result, and saves it in this folder. Signed in, **Edit recipe** on a recipe's page changes it later, in a form or as JSON. Setup is described in [install.md](install.md).
 
@@ -138,7 +138,7 @@ Common durations: 60 is 1 minute, 600 is 10 minutes, 900 is 15 minutes, 3600 is 
 
 The easiest way to add a photo is on the site. Sign in, open the recipe and use **Add photo**, or choose one on the import screen before saving. A chosen photo opens in an editor with a frame the shape of the recipe page's photo (3:2): drag it to reposition, and zoom with the slider, mouse wheel, a pinch or the + and − keys to crop it. Importing from a web page offers the page's own photo uncropped, with **Adjust photo** to crop it the same way. Photos added this way are scaled down to 1600 pixels on the long side and saved as JPEG without the camera's details (such as where the photo was taken), as `photos/<file name>-<code>.jpg`. The site fills in `image` for you. Replacing or removing the photo deletes the old file.
 
-To add one by hand, copy the file into `/var/www/nomnoms/photos/` on the server and set `image` to `"photos/"` followed by its name. The name may use letters, numbers, dots, hyphens and underscores, must start with a letter or number, and must end in `.jpg`, `.jpeg`, `.png` or `.webp`. Make large photos smaller first: 1600 pixels across is plenty. Browsers may keep showing the old version of a file for up to a day, so give a changed photo a new name. The site never deletes photos added by hand.
+To add one by hand, copy the file into `/var/www/nammet/photos/` on the server and set `image` to `"photos/"` followed by its name. The name may use letters, numbers, dots, hyphens and underscores, must start with a letter or number, and must end in `.jpg`, `.jpeg`, `.png` or `.webp`. Make large photos smaller first: 1600 pixels across is plenty. Browsers may keep showing the old version of a file for up to a day, so give a changed photo a new name. The site never deletes photos added by hand.
 
 Only files in the site's own `photos/` folder work. Addresses on other websites are ignored, and the import screen leaves them out with a warning, so visitors' browsers never contact other sites. If the file is missing, the recipe shows without a photo.
 

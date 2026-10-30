@@ -44,8 +44,8 @@ if [ -n "${SMOKE_USER:-}" ]; then
   # so it's read from the response headers and sent by hand.
   printf '{"username":"%s","password":"%s"}' "$SMOKE_USER" "${SMOKE_PASSWORD:?SMOKE_PASSWORD is needed with SMOKE_USER}" > "$TMP/login.json"
   code=$(status "$TMP/login" -D "$TMP/headers" -X POST -H 'Content-Type: application/json' \
-    -H 'X-Requested-With: nomnoms' --data-binary "@$TMP/login.json" "$BASE/api/login")
-  cookie=$(tr -d '\r' < "$TMP/headers" | sed -n 's/^[Ss]et-[Cc]ookie: \(nomnoms_session=[^;]*\).*/\1/p' | head -n 1)
+    -H 'X-Requested-With: nammet' --data-binary "@$TMP/login.json" "$BASE/api/login")
+  cookie=$(tr -d '\r' < "$TMP/headers" | sed -n 's/^[Ss]et-[Cc]ookie: \(nammet_session=[^;]*\).*/\1/p' | head -n 1)
   if [ "$code" = 200 ] && [ -n "$cookie" ]; then pass "sign in"; else fail "sign in (HTTP $code)"; fi
 
   code=$(status "$TMP/me2" -H "Cookie: $cookie" "$BASE/api/me")

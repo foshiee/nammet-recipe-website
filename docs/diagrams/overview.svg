@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 250" role="img" aria-labelledby="t d">
   <title id="t">How the site fits together</title>
-  <desc id="d">A browser connects over HTTPS to a reverse proxy, which forwards over HTTP to nginx on port 80. nginx serves the static site from /var/www/nomnoms and proxies /api/ to the Node import service on 127.0.0.1:3000.</desc>
+  <desc id="d">A browser connects over HTTPS to a reverse proxy, which forwards over HTTP to nginx on port 80. nginx serves the static site from /var/www/nammet and proxies /api/ to the Node import service on 127.0.0.1:3000.</desc>
   <style>
     text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 15px; fill: #0f172a; }
     .sub { font-size: 12.5px; fill: #475569; }
@@ -40,7 +40,7 @@
 
   <rect class="box" x="610" y="20" width="210" height="64" rx="10"/>
   <text x="715" y="48" text-anchor="middle">Static site</text>
-  <text class="sub" x="715" y="68" text-anchor="middle">/var/www/nomnoms</text>
+  <text class="sub" x="715" y="68" text-anchor="middle">/var/www/nammet</text>
 
   <rect class="core" x="610" y="166" width="210" height="64" rx="10"/>
   <text x="715" y="194" text-anchor="middle">Import service (Node)</text>

@@ -73,7 +73,7 @@ function requestOnce(url, { maxBytes, deadline }) {
       method: 'GET',
       lookup: safeLookup,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; nomnoms-recipe-import/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; nammet-recipe-import/1.0)',
         Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,application/pdf;q=0.8,image/*;q=0.7,*/*;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br',
         'Accept-Language': 'en'

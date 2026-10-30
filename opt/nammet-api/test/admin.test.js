@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nomnoms-admin-'));
+const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nammet-admin-'));
 process.env.SETTINGS_FILE = path.join(tmp, 'settings.json');
 process.env.THEME_DIR = path.join(tmp, 'theme');
 process.env.USERS_FILE = path.join(tmp, 'users.json');

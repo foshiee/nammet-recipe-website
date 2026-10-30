@@ -1,8 +1,8 @@
 {
-  "name": "nomnoms-api",
+  "name": "nammet-api",
   "version": "1.0.0",
   "private": true,
-  "description": "Login and recipe import service for the nomnoms recipe site",
+  "description": "Login and recipe import service for the nammet recipe site",
   "license": "MIT",
   "type": "module",
   "main": "server.js",

@@ -4,8 +4,8 @@ This guide sets up the recipe website on a server: nginx serving the static site
 
 ## How it works
 
-![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nomnoms-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nomnoms, writes recipes, photos and the theme folder under /var/www/nomnoms, and calls api.anthropic.com only when needed.](diagrams/architecture.svg#only-light)
-![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nomnoms-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nomnoms, writes recipes, photos and the theme folder under /var/www/nomnoms, and calls api.anthropic.com only when needed.](diagrams/architecture-dark.svg#only-dark)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nammet-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nammet, writes recipes, photos and the theme folder under /var/www/nammet, and calls api.anthropic.com only when needed.](diagrams/architecture.svg#only-light)
+![A browser connects over HTTPS to a reverse proxy (Traefik), which forwards to nginx on port 80. nginx serves the static site and proxies /api/ to nammet-api on 127.0.0.1:3000. That service reads and writes users.json and settings.json in /var/lib/nammet, writes recipes, photos and the theme folder under /var/www/nammet, and calls api.anthropic.com only when needed.](diagrams/architecture-dark.svg#only-dark)
 
 How each kind of input is converted, and what isn't supported, is covered in [Using the import service](using-the-service.md#how-imports-are-converted).
 
@@ -67,8 +67,8 @@ Any number counts as success, including `404`; it only proves the VM can reach t
 
 ```sh
 sudo dnf -y install git      # or: sudo apt install git
-git clone https://github.com/foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
-cd ~/nomnoms-recipe-website
+git clone https://github.com/foshiee/nammet-recipe-website.git ~/nammet-recipe-website
+cd ~/nammet-recipe-website
 ./install.sh
 ```
 
@@ -86,8 +86,8 @@ Run it as your normal user; it asks for your sudo password. It asks for the reve
 What it does, and doesn't do:
 
 - It installs the packages it needs, but doesn't upgrade the system. On the RHEL family it installs the repo's `nginx.conf`, as in step 12, keeping the old one as `nginx.conf.bak`. On Debian and Ubuntu it keeps the distro's `nginx.conf` and removes the `sites-enabled/default` site, which would clash with this one. If the distro's Node.js is older than 20, it adds NodeSource's Node.js 22 repository (on RHEL 9, it switches to the `nodejs:22` module stream instead).
-- It writes `/etc/nomnoms/api.env` only if it doesn't exist yet. After that, edit it by hand.
-- It writes `/etc/nginx/conf.d/nomnoms.conf` from the repo's copy each time, keeping the proxy addresses and Cloudflare setting already in it. If the file had other changes, it shows them and keeps the old file as `nomnoms.conf.bak`. If `nginx -t` fails, it puts the old file back.
+- It writes `/etc/nammet/api.env` only if it doesn't exist yet. After that, edit it by hand.
+- It writes `/etc/nginx/conf.d/nammet.conf` from the repo's copy each time, keeping the proxy addresses and Cloudflare setting already in it. If the file had other changes, it shows them and keeps the old file as `nammet.conf.bak`. If `nginx -t` fails, it puts the old file back.
 - It only adds firewall rules if firewalld or ufw is already running. Without `--proxy`, it opens port 80 to everyone and says so.
 - It never touches the recipes, photos, users or the admin page's settings.
 
@@ -100,8 +100,8 @@ These are the steps `install.sh` runs. The VM keeps its own clone of the repo an
 The repo is public, so cloning and pulling over HTTPS need no key or GitHub account. Clone it into your home directory. Never clone it into `/var/www`, where nginx would serve `.git/` and everything else in the repo.
 
 ```sh
-git clone https://github.com/foshiee/nomnoms-recipe-website.git ~/nomnoms-recipe-website
-cd ~/nomnoms-recipe-website
+git clone https://github.com/foshiee/nammet-recipe-website.git ~/nammet-recipe-website
+cd ~/nammet-recipe-website
 ```
 
 The steps below run from this folder. The repo's `.gitattributes` makes every checkout use LF line endings, which the systemd unit and `api.env` need.
@@ -109,48 +109,48 @@ The steps below run from this folder. The repo's `.gitattributes` makes every ch
 ### 5. Create the service account and the site's folders
 
 ```sh
-sudo useradd --system --home-dir /var/lib/nomnoms --shell /sbin/nologin nomnoms
-sudo install -d -m 0700 -o nomnoms -g nomnoms /var/lib/nomnoms
-sudo install -d -m 0755 /var/www/nomnoms /var/www/nomnoms/recipes
-sudo install -d -m 0755 -o nomnoms -g nomnoms /var/www/nomnoms/theme /var/www/nomnoms/photos
+sudo useradd --system --home-dir /var/lib/nammet --shell /sbin/nologin nammet
+sudo install -d -m 0700 -o nammet -g nammet /var/lib/nammet
+sudo install -d -m 0755 /var/www/nammet /var/www/nammet/recipes
+sudo install -d -m 0755 -o nammet -g nammet /var/www/nammet/theme /var/www/nammet/photos
 ```
 
-`/var/lib/nomnoms` holds the users file and the admin page's settings, including the API key if you save one there. Recipe files go in `/var/www/nomnoms/recipes/`; see [recipe-format.md](recipe-format.md). `/var/www/nomnoms/theme` is public: the service writes the site's look into it (`theme.css`, `site.json` and the icon) each time an admin saves, and once when it starts. `/var/www/nomnoms/photos` is public too and holds the recipe photos added on the site.
+`/var/lib/nammet` holds the users file and the admin page's settings, including the API key if you save one there. Recipe files go in `/var/www/nammet/recipes/`; see [recipe-format.md](recipe-format.md). `/var/www/nammet/theme` is public: the service writes the site's look into it (`theme.css`, `site.json` and the icon) each time an admin saves, and once when it starts. `/var/www/nammet/photos` is public too and holds the recipe photos added on the site.
 
 ### 6. Install the website and the service code
 
 ```sh
-sudo install -m 0644 var/www/nomnoms/index.html var/www/nomnoms/app.js var/www/nomnoms/style.css var/www/nomnoms/robots.txt /var/www/nomnoms/
-sudo restorecon -Rv /var/www/nomnoms   # SELinux labels
-sudo cp -r opt/nomnoms-api /opt/nomnoms-api
-cd /opt/nomnoms-api && sudo npm ci --omit=dev && cd -
+sudo install -m 0644 var/www/nammet/index.html var/www/nammet/app.js var/www/nammet/style.css var/www/nammet/robots.txt /var/www/nammet/
+sudo restorecon -Rv /var/www/nammet   # SELinux labels
+sudo cp -r opt/nammet-api /opt/nammet-api
+cd /opt/nammet-api && sudo npm ci --omit=dev && cd -
 ```
 
 The service code is copied with `cp -r` because `install` can't copy folders. `npm ci` installs the two dependencies (`@anthropic-ai/sdk` and `busboy`) at the exact versions in `package-lock.json`.
 
 ### 7. Let the service write recipes
 
-This adds write access for `nomnoms` without changing who owns the folder, so you can still copy files in by hand:
+This adds write access for `nammet` without changing who owns the folder, so you can still copy files in by hand:
 
 ```sh
-sudo setfacl -m u:nomnoms:rwx /var/www/nomnoms/recipes
+sudo setfacl -m u:nammet:rwx /var/www/nammet/recipes
 ```
 
 #### Optional: let an SFTP user upload recipes by hand
 
-The folder is owned by root, so any other account (for example `loginuser`, used with scp or FileZilla) can read it but not upload to it. Give that account write access the same way. The second command sets default ACLs, so files created by either `loginuser` or `nomnoms` stay writable by both. Without it, the import service may be unable to overwrite a recipe that was uploaded by hand.
+The folder is owned by root, so any other account (for example `loginuser`, used with scp or FileZilla) can read it but not upload to it. Give that account write access the same way. The second command sets default ACLs, so files created by either `loginuser` or `nammet` stay writable by both. Without it, the import service may be unable to overwrite a recipe that was uploaded by hand.
 
 ```sh
-sudo setfacl -m u:loginuser:rwx /var/www/nomnoms/recipes
-sudo setfacl -d -m u:loginuser:rwx -m u:nomnoms:rwx /var/www/nomnoms/recipes
-getfacl /var/www/nomnoms/recipes     # check both users are listed
+sudo setfacl -m u:loginuser:rwx /var/www/nammet/recipes
+sudo setfacl -d -m u:loginuser:rwx -m u:nammet:rwx /var/www/nammet/recipes
+getfacl /var/www/nammet/recipes     # check both users are listed
 ```
 
 To upload photos by hand as well, give the same account write access to the photos folder:
 
 ```sh
-sudo setfacl -m u:loginuser:rwx /var/www/nomnoms/photos
-sudo setfacl -d -m u:loginuser:rwx -m u:nomnoms:rwx /var/www/nomnoms/photos
+sudo setfacl -m u:loginuser:rwx /var/www/nammet/photos
+sudo setfacl -d -m u:loginuser:rwx -m u:nammet:rwx /var/www/nammet/photos
 ```
 
 If uploads still fail, see [Troubleshooting](#troubleshooting).
@@ -158,30 +158,30 @@ If uploads still fail, see [Troubleshooting](#troubleshooting).
 ### 8. Configuration
 
 ```sh
-sudo install -d -m 0750 -o root -g nomnoms /etc/nomnoms
-sudo install -m 0640 -o root -g nomnoms etc/nomnoms/api.env.example /etc/nomnoms/api.env
-sudo nano /etc/nomnoms/api.env     # paste your key after ANTHROPIC_API_KEY=
+sudo install -d -m 0750 -o root -g nammet /etc/nammet
+sudo install -m 0640 -o root -g nammet etc/nammet/api.env.example /etc/nammet/api.env
+sudo nano /etc/nammet/api.env     # paste your key after ANTHROPIC_API_KEY=
 ```
 
 No quotes or spaces around the key. You can also leave it empty and add the key on the admin page once the site is running, which needs no restart. A key saved on the admin page takes priority over this file. Without any key, everything except PDF, photo and text imports still works.
 
 ### 9. Create your login
 
-This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Run it from `/opt/nomnoms-api`, because the `nomnoms` account can't read your home directory. The password is temporary, so you'll choose your own the first time you sign in. Add `--permanent` to skip that.
+This creates the first admin. Everyone else can be added from the admin page. Passwords need at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Run it from `/opt/nammet-api`, because the `nammet` account can't read your home directory. The password is temporary, so you'll choose your own the first time you sign in. Add `--permanent` to skip that.
 
 ```sh
-cd /opt/nomnoms-api
-sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js yourname --role admin
+cd /opt/nammet-api
+sudo -u nammet USERS_FILE=/var/lib/nammet/users.json node tools/add-user.js yourname --role admin
 cd -
 ```
 
 ### 10. Start the service
 
 ```sh
-sudo install -m 0644 etc/systemd/system/nomnoms-api.service /etc/systemd/system/
+sudo install -m 0644 etc/systemd/system/nammet-api.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now nomnoms-api
-systemctl status nomnoms-api --no-pager      # should say "active (running)"
+sudo systemctl enable --now nammet-api
+systemctl status nammet-api --no-pager      # should say "active (running)"
 curl -s http://127.0.0.1:3000/api/me         # {"user":null}
 ```
 
@@ -202,13 +202,13 @@ getsebool httpd_can_network_connect     # httpd_can_network_connect --> on
 
 ```sh
 sudo install -m 0644 etc/nginx/nginx.conf /etc/nginx/nginx.conf
-sudo install -m 0644 etc/nginx/conf.d/nginx-nomnoms.conf /etc/nginx/conf.d/nomnoms.conf
-sudo nano /etc/nginx/conf.d/nomnoms.conf     # set Traefik's address, uncomment the three real-IP lines
+sudo install -m 0644 etc/nginx/conf.d/nginx-nammet.conf /etc/nginx/conf.d/nammet.conf
+sudo nano /etc/nginx/conf.d/nammet.conf     # set Traefik's address, uncomment the three real-IP lines
 sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
 sudo firewall-cmd --permanent --add-service=http && sudo firewall-cmd --reload   # so Traefik can reach port 80
 ```
 
-The main `nginx.conf` is the stock one with its sample server blocks commented out, so `nomnoms.conf` is the only site.
+The main `nginx.conf` is the stock one with its sample server blocks commented out, so `nammet.conf` is the only site.
 
 The address to use, and how to find it, is in the security checklist below.
 
@@ -220,7 +220,7 @@ The address to use, and how to find it, is in the security checklist below.
 4. Save it. You should land on the new recipe, and it should be on the home page.
 5. Use **Edit recipe** on it, change something small such as the time, and save. The recipe page should show the change.
 6. If you set an API key, import a photo or PDF of a recipe as well. That checks the Claude path.
-7. Watch it all in the log: `journalctl -u nomnoms-api -f`.
+7. Watch it all in the log: `journalctl -u nammet-api -f`.
 
 If any of this doesn't work, see [Troubleshooting](#troubleshooting).
 
@@ -246,7 +246,7 @@ Traefik ends HTTPS, so passwords and session cookies are encrypted between the b
 - **Traefik redirects HTTP to HTTPS** for this site's router.
 - **The Traefik to nginx hop stays on a trusted network**, such as the same host, a Docker network or your LAN.
 - **The real-IP lines in the nginx config are filled in.** Without them, the login rate limit and the recipe-file rate limit count all visitors as one, so failed logins from anyone lock everyone out for 15 minutes, and a busy evening can get everyone a 429.
-- **Behind Cloudflare, nginx trusts Cloudflare's ranges too.** Otherwise the first column of `access.log` shows Cloudflare addresses (such as `172.70.x.x`) instead of visitors, and the rate limits count per Cloudflare server. Write the ranges to a file, then uncomment the `include` line under the real-IP lines in `nomnoms.conf`:
+- **Behind Cloudflare, nginx trusts Cloudflare's ranges too.** Otherwise the first column of `access.log` shows Cloudflare addresses (such as `172.70.x.x`) instead of visitors, and the rate limits count per Cloudflare server. Write the ranges to a file, then uncomment the `include` line under the real-IP lines in `nammet.conf`:
 
   ```sh
   { curl -s https://www.cloudflare.com/ips-v4; echo; curl -s https://www.cloudflare.com/ips-v6; echo; } \
@@ -255,7 +255,7 @@ Traefik ends HTTPS, so passwords and session cookies are encrypted between the b
   ```
 
   Cloudflare appends the address that connected to it, so visitors can't fake their way past this. The ranges change rarely; re-run the command every few months.
-- **`COOKIE_SECURE=true`** in `/etc/nomnoms/api.env`, which is the default.
+- **`COOKIE_SECURE=true`** in `/etc/nammet/api.env`, which is the default.
 
 What the service does to protect itself:
 
@@ -270,17 +270,17 @@ What the service does to protect itself:
 - Admin routes need the admin role, and import routes need the importer or admin role. Role changes and removals apply to open sessions straight away, and a password reset signs that user out everywhere.
 - Until someone with a temporary password has chosen their own, the server refuses every import and admin request from them. Changing a password needs the current one, counts wrong attempts towards the sign-in limit, and signs out the user's other sessions.
 - There's no self-service password reset, so there's nothing to abuse by guessing a user name. Only an admin, or someone with shell access to the VM, can reset a password.
-- An API key saved on the admin page is stored in `/var/lib/nomnoms/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
+- An API key saved on the admin page is stored in `/var/lib/nammet/settings.json` (mode 0600, outside the web root). It is never sent back to the browser or written to the log: the admin page only shows its last four characters. The key field is masked and can't be copied out.
 - Only checked values reach the public `theme/` folder: colours must be hex codes, and the main text, link and button colours must contrast at least 3:1 with what's behind them (the admin page warns below 4.5:1); fonts come from a fixed list, corner rounding must be a whole number of pixels from 0 to 24, and icons must be PNG, ICO or WebP (SVG uploads are refused).
-- systemd limits the service to writing in the recipes, photos and theme folders and `/var/lib/nomnoms`.
+- systemd limits the service to writing in the recipes, photos and theme folders and `/var/lib/nammet`.
 
 ## Day to day
 
 - **Users, the site's look and the API key:** use the admin page.
-- **From the command line** (for example if you're locked out): `sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node /opt/nomnoms-api/tools/add-user.js <name> [--role admin|importer] [--permanent]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). The password is temporary unless you pass `--permanent`, for example when resetting your own. Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nomnoms-api`).
-- **Logs:** `journalctl -u nomnoms-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
+- **From the command line** (for example if you're locked out): `sudo -u nammet USERS_FILE=/var/lib/nammet/users.json node /opt/nammet-api/tools/add-user.js <name> [--role admin|importer] [--permanent]` adds a user or resets a password. New users are importers unless you pass `--role admin` (or there's no admin yet). The password is temporary unless you pass `--permanent`, for example when resetting your own. Add `--remove` to remove a user, or use `--list` instead of a name. Changes made this way don't reach sessions that are already open until they expire or the service restarts (`sudo systemctl restart nammet-api`).
+- **Logs:** `journalctl -u nammet-api -f`. Each import logs who imported what and which method was used. Claude imports also log token usage.
 - **Restarting** signs everyone out, because sessions are kept in memory.
-- **Updating:** in `~/nomnoms-recipe-website`, pull the changes and run the installer again. This works for an install done by hand too.
+- **Updating:** in `~/nammet-recipe-website`, pull the changes and run the installer again. This works for an install done by hand too.
 
   ```sh
   git pull --ff-only
@@ -294,45 +294,45 @@ What the service does to protect itself:
 
 Imports use `claude-sonnet-5-5` at medium effort by default. At time of writing, that model costs $2 per million input tokens and $10 per million output tokens. Most of the cost is the output, meaning the recipe itself plus the model's reasoning. Expect roughly 2 to 5 US cents per recipe, and more for a long multi-page PDF. These are estimates, so check real figures in the Anthropic console after your first few imports.
 
-To change the model or effort, use the admin page (takes effect on the next import), or set `MODEL` / `EFFORT` in `/etc/nomnoms/api.env` and restart the service (`sudo systemctl restart nomnoms-api`). The admin page wins when both are set. `claude-haiku-5-5` costs about a twentieth as much ($0.10 and $0.50 per million tokens, a fraction of a cent per recipe) and handles clear pages and typed text well; check a few drafts closely before relying on it for photos and scans. If blurry photos or messy scanned PDFs come out wrong, `claude-opus-5-5` is more accurate at about twice the price of Sonnet.
+To change the model or effort, use the admin page (takes effect on the next import), or set `MODEL` / `EFFORT` in `/etc/nammet/api.env` and restart the service (`sudo systemctl restart nammet-api`). The admin page wins when both are set. `claude-haiku-5-5` costs about a twentieth as much ($0.10 and $0.50 per million tokens, a fraction of a cent per recipe) and handles clear pages and typed text well; check a few drafts closely before relying on it for photos and scans. If blurry photos or messy scanned PDFs come out wrong, `claude-opus-5-5` is more accurate at about twice the price of Sonnet.
 
 ## Troubleshooting
 
-Three logs explain most problems: the service's (`journalctl -u nomnoms-api -e`), nginx's (`sudo tail /var/log/nginx/error.log`) and SELinux's denials (`sudo ausearch -m avc -ts recent`).
+Three logs explain most problems: the service's (`journalctl -u nammet-api -e`), nginx's (`sudo tail /var/log/nginx/error.log`) and SELinux's denials (`sudo ausearch -m avc -ts recent`).
 
-- **The service won't start.** `systemctl status nomnoms-api` shows the reason:
-  - `status=226/NAMESPACE`: a folder the service is allowed to write to doesn't exist. systemd needs all four (`/var/www/nomnoms/recipes`, `/var/www/nomnoms/photos`, `/var/www/nomnoms/theme` and `/var/lib/nomnoms`) before it will start the service. Create them as in step 5.
-  - `Failed to load environment files`: `/etc/nomnoms/api.env` is missing. See step 8.
-  - `ERR_MODULE_NOT_FOUND` in the log: the dependencies aren't installed. Run `npm ci` in `/opt/nomnoms-api` as in step 6.
-- ***The import service isn't available on this server.*** nginx can't reach the service. `curl -s http://127.0.0.1:3000/api/me` on the VM should print `{"user":null}`; if it doesn't, the service isn't running. If it does, the problem is between nginx and the service. `Permission denied` in nginx's error log means the SELinux setting from step 11 is off. If the error log shows nothing, nginx is probably missing the `/api/` block, so check that `/etc/nginx/conf.d/nomnoms.conf` is the copy from step 12.
-- ***Couldn't load the recipe list.*** nginx isn't returning the JSON listing of the recipes folder. Opening `/recipes/` on the site should show a list like `[{"name":"example-recipe.json","type":"file",...}]`. If it doesn't, check that the `location /recipes/` block is in `nomnoms.conf`, then run `sudo nginx -t && sudo systemctl reload nginx`. If you see nginx's welcome page instead of the site, another server block is answering; the `nginx.conf` from step 12 has the sample ones commented out.
+- **The service won't start.** `systemctl status nammet-api` shows the reason:
+  - `status=226/NAMESPACE`: a folder the service is allowed to write to doesn't exist. systemd needs all four (`/var/www/nammet/recipes`, `/var/www/nammet/photos`, `/var/www/nammet/theme` and `/var/lib/nammet`) before it will start the service. Create them as in step 5.
+  - `Failed to load environment files`: `/etc/nammet/api.env` is missing. See step 8.
+  - `ERR_MODULE_NOT_FOUND` in the log: the dependencies aren't installed. Run `npm ci` in `/opt/nammet-api` as in step 6.
+- ***The import service isn't available on this server.*** nginx can't reach the service. `curl -s http://127.0.0.1:3000/api/me` on the VM should print `{"user":null}`; if it doesn't, the service isn't running. If it does, the problem is between nginx and the service. `Permission denied` in nginx's error log means the SELinux setting from step 11 is off. If the error log shows nothing, nginx is probably missing the `/api/` block, so check that `/etc/nginx/conf.d/nammet.conf` is the copy from step 12.
+- ***Couldn't load the recipe list.*** nginx isn't returning the JSON listing of the recipes folder. Opening `/recipes/` on the site should show a list like `[{"name":"example-recipe.json","type":"file",...}]`. If it doesn't, check that the `location /recipes/` block is in `nammet.conf`, then run `sudo nginx -t && sudo systemctl reload nginx`. If you see nginx's welcome page instead of the site, another server block is answering; the `nginx.conf` from step 12 has the sample ones commented out.
 - **Signing in seems to work, but you're asked to sign in again straight away.** The browser isn't keeping the session cookie. With `COOKIE_SECURE=true`, the default, it's only kept over HTTPS, so signing in over plain HTTP, for example by opening the VM's address directly, can't work. Use the site's HTTPS address. Don't turn `COOKIE_SECURE` off to get round it.
 - ***Too many failed sign-in attempts* for everyone, or recipes failing with *HTTP 429*.** nginx sees every visitor as coming from Traefik's address, so they all share one rate limit. Fill in the real-IP lines, and trust Cloudflare's ranges if it's in front (see the [security checklist](#security-checklist-traefik-in-front)). The sign-in lockout clears after 15 minutes, or straight away when the service restarts.
 - **A recipe or photo you added by hand doesn't show.** A recipe file nginx can't serve is listed on the home page under *Some recipe files couldn't be read*, with the reason:
-  - *HTTP 403*: nginx isn't allowed to read the file. A file moved in with `mv` keeps the SELinux label from where it was, while copied and uploaded files take the folder's; `sudo restorecon -Rv /var/www/nomnoms` fixes the label. The file also needs to be readable by everyone (`chmod 644`).
+  - *HTTP 403*: nginx isn't allowed to read the file. A file moved in with `mv` keeps the SELinux label from where it was, while copied and uploaded files take the folder's; `sudo restorecon -Rv /var/www/nammet` fixes the label. The file also needs to be readable by everyone (`chmod 644`).
   - A JSON error: the file isn't valid JSON. `python3 -m json.tool file.json` shows where.
 
   Only files ending in `.json` count as recipes.
 - **PDF, photo and text imports fail, but web pages import.** If the message says no Anthropic API key is set, add one on the admin page, or in `api.env` and restart the service. *The server's Anthropic API key was rejected* means the key is wrong or has been revoked; the admin page's **Test key** button checks a saved key.
 - **Uploads over SFTP fail.**
-  - **Write access:** the account needs the ACLs from step 7's SFTP section. `getfacl /var/www/nomnoms/recipes` should list it.
+  - **Write access:** the account needs the ACLs from step 7's SFTP section. `getfacl /var/www/nammet/recipes` should list it.
   - **Chroot:** if the account is chrooted or limited to `internal-sftp` in `sshd_config`, the chroot directory must be root-owned and not writable, so uploads must go into a writable subfolder.
-  - **Permissions:** the account needs execute (`x`) on every parent folder. `/var/www/nomnoms` is `0755`, so this normally works.
+  - **Permissions:** the account needs execute (`x`) on every parent folder. `/var/www/nammet` is `0755`, so this normally works.
 
 ## Trying it locally
 
 On your own machine, no nginx is needed. The service can serve the site too, and it emulates nginx's JSON folder listing:
 
 ```sh
-cd opt/nomnoms-api
+cd opt/nammet-api
 npm install
 USERS_FILE=./dev-users.json node tools/add-user.js tester --role admin --permanent
-mkdir -p ../../var/www/nomnoms/theme
-USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nomnoms/theme \
-  RECIPES_DIR=../../var/www/nomnoms/recipes PHOTOS_DIR=../../var/www/nomnoms/photos \
-  DEV_STATIC_ROOT=../../var/www/nomnoms COOKIE_SECURE=false node server.js
+mkdir -p ../../var/www/nammet/theme
+USERS_FILE=./dev-users.json SETTINGS_FILE=./dev-settings.json THEME_DIR=../../var/www/nammet/theme \
+  RECIPES_DIR=../../var/www/nammet/recipes PHOTOS_DIR=../../var/www/nammet/photos \
+  DEV_STATIC_ROOT=../../var/www/nammet COOKIE_SECURE=false node server.js
 ```
 
-Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nomnoms/recipes/` folder, so delete any test recipes before committing. `dev-users.json`, `dev-settings.json`, the generated `var/www/nomnoms/theme/` folder and photos other than the example recipe's are gitignored.
+Then open http://127.0.0.1:3000. On Windows PowerShell, set the variables with `$env:USERS_FILE = "./dev-users.json"` and so on. Recipes saved this way land in the repo's `var/www/nammet/recipes/` folder, so delete any test recipes before committing. `dev-users.json`, `dev-settings.json`, the generated `var/www/nammet/theme/` folder and photos other than the example recipe's are gitignored.
 
 Tests for the parts that don't need Claude: `npm test`.

@@ -15,7 +15,7 @@
 // The password is asked for twice without echoing. It can also be piped in on
 // stdin (one line) for scripted setups. Uses USERS_FILE, like the server.
 // On the VM run it as the service user so the file keeps the right owner:
-//   cd /opt/nomnoms-api && sudo -u nomnoms USERS_FILE=/var/lib/nomnoms/users.json node tools/add-user.js yourname --role admin
+//   cd /opt/nammet-api && sudo -u nammet USERS_FILE=/var/lib/nammet/users.json node tools/add-user.js yourname --role admin
 //
 // A running service picks up new users and passwords at the next sign-in. Sessions that
 // are already open keep their old role until they expire or the service restarts.

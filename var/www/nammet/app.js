@@ -188,7 +188,7 @@
   };
 
   // A photo in the site's photos folder; anything else (such as another site's address) is
-  // ignored. The same pattern is in opt/nomnoms-api/import/validate.js.
+  // ignored. The same pattern is in opt/nammet-api/import/validate.js.
   const IMAGE_RE = /^photos\/[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:jpe?g|png|webp)$/;
 
   function normalizeGroups(raw) {
@@ -992,9 +992,9 @@
 
   /* ---------- sign-in & import ---------- */
 
-  // The import service lives at /api/ (opt/nomnoms-api). Browsing never depends on it.
+  // The import service lives at /api/ (opt/nammet-api). Browsing never depends on it.
   async function api(path, { method = 'GET', json, form } = {}) {
-    const opts = { method, headers: { 'X-Requested-With': 'nomnoms' }, credentials: 'same-origin', cache: 'no-store' };
+    const opts = { method, headers: { 'X-Requested-With': 'nammet' }, credentials: 'same-origin', cache: 'no-store' };
     if (json !== undefined) {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(json);

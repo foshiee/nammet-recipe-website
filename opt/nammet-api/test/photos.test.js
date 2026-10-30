@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nomnoms-photos-'));
+const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'nammet-photos-'));
 process.env.RECIPES_DIR = path.join(tmp, 'recipes');
 process.env.PHOTOS_DIR = path.join(tmp, 'photos');
 

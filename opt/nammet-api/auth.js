@@ -235,7 +235,7 @@ function recordFailure(ip, username) {
 // In memory: a service restart signs everyone out, which is fine for a handful of users.
 const sessions = new Map(); // token -> { username, role, expires }
 
-export const COOKIE = 'nomnoms_session';
+export const COOKIE = 'nammet_session';
 
 export async function login(username, password, ip) {
   username = String(username || '').trim().toLowerCase();
