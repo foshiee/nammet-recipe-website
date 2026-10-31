@@ -80,7 +80,7 @@ test('colourblind themes keep accent and errors apart', () => {
     deuteranopia: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
     tritanopia: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]]
   };
-  // Each theme and the types its label names
+  // Each theme and the types its note names
   const COLOURBLIND = { 'blue-orange': ['protanopia', 'deuteranopia'], 'teal-crimson': ['tritanopia'] };
 
   const linear = (hex) => [1, 3, 5].map((i) => {
@@ -98,7 +98,7 @@ test('colourblind themes keep accent and errors apart', () => {
   const deltaE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
 
   for (const [key, types] of Object.entries(COLOURBLIND)) {
-    assert.ok(settings.THEMES[key].label.includes(types[0]), key);
+    assert.ok(settings.THEMES[key].note.toLowerCase().includes(types[0]), key);
     for (const scheme of ['light', 'dark']) {
       const { accent, danger } = settings.THEMES[key].colors[scheme];
       for (const type of types) {

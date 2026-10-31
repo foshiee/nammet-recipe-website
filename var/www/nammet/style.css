@@ -901,6 +901,7 @@ h2 {
 .theme-card:hover { border-color: var(--muted); }
 .theme-card:has(input:checked) { border-color: var(--accent); background: var(--tint); font-weight: 600; }
 .theme-card:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-note { display: block; color: var(--muted); font-size: .8rem; font-weight: 400; }
 
 /* The card is the control; the radio stays in the form for keyboard and screen readers */
 .import .theme-card input { position: absolute; width: 1px; height: 1px; padding: 0; opacity: 0; pointer-events: none; }
