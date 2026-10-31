@@ -98,7 +98,7 @@ Don't publish the container's port anywhere but to the proxy. Docker's published
 
 ## Running a public demo
 
-`DEMO_MODE=true` makes it safe to hand out an admin login. Visitors can try everything: importing a recipe, editing it in the form or as JSON, and restyling the site. Nothing they write reaches anyone else, though. Imports only ever produce a draft in their browser, and the service refuses to save recipes or photos, upload a site icon, change the site name or icon, manage users or passwords, set the API key, model or effort, or delete recipes. Colours, fonts and corners can still be saved, since they're picked from fixed lists. The site shows the refused controls disabled.
+`DEMO_MODE=true` makes it safe to hand out an admin login. Visitors can try everything: importing a recipe, editing it in the form or as JSON, and restyling the site. Nothing they write reaches anyone else, though. Imports only ever produce a draft in their browser, and the service refuses to save recipes or photos, change the appearance or site icon, manage users or passwords, set the API key, model or effort, or delete recipes. The photo editor still opens, but the photo isn't kept. Colours, fonts and corners can be saved, but only in the visitor's own browser. The site shows the refused controls disabled.
 
 1. Set `DEMO_MODE=true`, and `DEMO_HINT` to the login you're handing out, for example `Demo login: demo / Demo-pass-1234`.
 2. Create the demo user with a permanent password, since it can't be changed from the site: `docker exec -it nammet add-user demo --role admin --permanent`. The password can be piped in on stdin for a script.

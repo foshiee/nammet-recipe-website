@@ -22,6 +22,10 @@
     try { localStorage.setItem('recipes:' + key, value); } catch (e) { /* storage unavailable */ }
   };
 
+  const delPref = (key) => {
+    try { localStorage.removeItem('recipes:' + key); } catch (e) { /* storage unavailable */ }
+  };
+
   const trim = (n, digits) => String(parseFloat(n.toFixed(digits)));
 
   /* ---------- units ---------- */
@@ -305,6 +309,61 @@
     } catch (e) { /* keep the defaults */ }
   }
 
+  // Demo mode keeps appearance changes in this browser, since the server refuses them.
+  // index.html applies the saved CSS before the page paints; the look refills the admin page.
+  function localLook() {
+    if (!state.demo) return null;
+    try { return JSON.parse(getPref('look', 'null')); } catch (e) { return null; }
+  }
+
+  const showThumbnails = () => {
+    const l = localLook();
+    return l ? l.thumbnails === true : state.site.thumbnails;
+  };
+
+  function setLocalLook(look, css) {
+    if (look) {
+      setPref('look', JSON.stringify(look));
+      setPref('look-css', css);
+    } else {
+      delPref('look');
+      delPref('look-css');
+    }
+    let el = document.getElementById('local-look');
+    if (!look) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'local-look';
+      document.head.appendChild(el); // after theme.css, so it wins
+    }
+    el.textContent = css;
+  }
+
+  // A copy of renderThemeCss in opt/nammet-api/settings.js; keep them alike
+  function renderLookCss(a, fonts) {
+    const vars = (colors, indent) => Object.entries(colors).map(([k, v]) => `${indent}--${k}: ${v};`).join('\n');
+    return `:root {
+${vars(a.colors.light, '  ')}
+  --font-heading: ${fonts[a.fonts.heading].stack};
+  --font-body: ${fonts[a.fonts.body].stack};
+  --radius: ${a.radius}px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+${vars(a.colors.dark, '    ')}
+  }
+}
+
+:root[data-theme="dark"] {
+${vars(a.colors.dark, '  ')}
+}
+`;
+  }
+
   const pageTitle = (sub) => { document.title = sub ? `${sub} | ${state.site.name}` : state.site.name; };
 
   /* ---------- home view ---------- */
@@ -393,7 +452,7 @@
 
     // A photo beside each row that has one, when switched on in the admin page. Rows
     // without a photo look the same as with the setting off.
-    const thumb = (r) => state.site.thumbnails && r.image;
+    const thumb = (r) => showThumbnails() && r.image;
 
     list.innerHTML = shown.map((r) => `
       <li>
@@ -949,14 +1008,14 @@
     const p = state.photo;
     const msg = p.busy ? '<p class="working">Saving the photo…</p>'
       : p.msg && p.msg.slug === r.slug ? `<p class="${p.msg.ok ? 'form-ok' : 'form-error'}">${esc(p.msg.text)}</p>` : '';
-    const dis = p.busy || state.demo ? ' disabled' : '';
+    const dis = p.busy ? ' disabled' : '';
     box.innerHTML = (canImport() ? `
       <div class="photo-tools">
         <a class="button secondary" href="#/edit/${encodeURIComponent(r.slug)}">Edit recipe</a>
         <button class="button secondary" data-action="pick-file" data-for="photo-file"${dis}>${r.image ? 'Change photo' : 'Add photo'}</button>
-        ${r.image ? `<button class="button secondary" data-action="photo-remove"${dis}>Remove photo</button>` : ''}
+        ${r.image ? `<button class="button secondary" data-action="photo-remove"${dis || demoOff()}>Remove photo</button>` : ''}
         <input id="photo-file" type="file" accept="image/*" data-action="photo-file" hidden>
-      </div>${demoReason('Changing photos is')}` : '') + (msg ? `<div class="photo-msg" aria-live="polite">${msg}</div>` : '');
+      </div>${demoReason('Saving photos is')}` : '') + (msg ? `<div class="photo-msg" aria-live="polite">${msg}</div>` : '');
   }
 
   // Runs a photo change for the open recipe; the page isn't redrawn, so timers keep going
@@ -990,7 +1049,14 @@
       drawPhotoTools();
       return;
     }
-    if (out && state.current === r) photoRequest((slug) => uploadPhoto(slug, out));
+    if (!out || state.current !== r) return;
+    // The demo lets visitors try the photo editor, but keeps nothing they upload
+    if (state.demo) {
+      state.photo.msg = { slug: r.slug, text: "Saving photos is turned off in the demo, so this one wasn't kept." };
+      drawPhotoTools();
+      return;
+    }
+    photoRequest((slug) => uploadPhoto(slug, out));
   }
 
   function removePhoto() {
@@ -1029,6 +1095,7 @@
       state.user = me.user;
       state.demo = !!me.demo;
       state.demoHint = me.demoHint || '';
+      if (!state.demo) setLocalLook(null); // left over from when this site was a demo
     } catch (e) {
       state.user = null;
     }
@@ -1982,6 +2049,8 @@
   // `look`, the appearance as edited on the page, which is previewed live until saved.
 
   const clone = (v) => JSON.parse(JSON.stringify(v));
+  // The look the admin page starts from and goes back to: the site's, or this browser's in demo mode
+  const savedLook = (settings) => ({ ...clone(settings.appearance), ...(localLook() || {}) });
   const ROLE_TEXT = { admin: 'Admin', importer: 'Importer' };
 
   function showAdmin() {
@@ -2015,7 +2084,7 @@
   async function loadAdmin() {
     try {
       const [settings, users] = await Promise.all([api('admin/settings'), api('admin/users')]);
-      state.admin = { settings, users: users.users, look: clone(settings.appearance), resetFor: null };
+      state.admin = { settings, users: users.users, look: savedLook(settings), resetFor: null };
       drawAdmin();
     } catch (e) {
       if (e.status === 401 || e.status === 403) return adminError(e);
@@ -2060,7 +2129,7 @@
     const body = document.getElementById('admin-body');
     if (!body || !state.admin) return;
     body.innerHTML = `
-      ${state.demo ? '<div class="notice"><p><strong>Demo mode:</strong> try anything, but only colours, fonts and corners can be saved. Saving recipes and photos, the site name and icon, users, passwords, the API key and the model are turned off. The site resets regularly.</p></div>' : ''}
+      ${state.demo ? '<div class="notice"><p><strong>Demo mode:</strong> try anything. Colours, fonts and corners are saved in this browser only. Saving recipes and photos, the site name and icon, users, passwords, the API key and the model are turned off. The site resets regularly.</p></div>' : ''}
       <section class="admin-section" aria-labelledby="ad-look-h"><h2 id="ad-look-h">Appearance</h2><div id="admin-look"></div></section>
       <section class="admin-section" aria-labelledby="ad-ai-h"><h2 id="ad-ai-h">Claude</h2><div id="admin-ai"></div></section>
       <section class="admin-section" aria-labelledby="ad-users-h"><h2 id="ad-users-h">Users</h2><div id="admin-users"></div></section>`;
@@ -2089,7 +2158,7 @@
         <span>${esc(o.themes[k].label)}</span></label>`).join('');
 
     box.innerHTML = `
-      <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. Visitors see them once you save.</p>
+      <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. ${state.demo ? 'In the demo, saving keeps them in this browser only.' : 'Visitors see them once you save.'}</p>
       <form class="admin-form" data-action="admin-look">
         <label for="ad-name">Site name</label>
         <input id="ad-name" name="siteName" maxlength="60" required value="${esc(look.siteName)}"${demoOff()}>
@@ -2251,6 +2320,7 @@
 
   async function saveLook(form) {
     const look = readLook(form);
+    if (state.demo) return saveLocalLook(look);
     if (look.favicon.type === 'emoji' && !look.favicon.value) {
       setMsg('look', 'Choose an emoji for the site icon, or upload an image.');
       return;
@@ -2264,6 +2334,28 @@
       drawLook();
       setMsg('look', 'Saved. Visitors see the new look the next time they load the site.', true);
     });
+  }
+
+  // Demo mode: the same checks as the server, then into this browser's storage. A look
+  // that matches the site's just clears what was saved.
+  function saveLocalLook(look) {
+    const o = state.admin.settings.options;
+    const hex = /^#[0-9a-f]{6}$/i;
+    const valid = o.themes[look.theme] && o.fonts[look.fonts.heading] && o.fonts[look.fonts.body] &&
+      Number.isInteger(look.radius) && look.radius >= o.radius.min && look.radius <= o.radius.max &&
+      ['light', 'dark'].every((s) => Object.entries(look.colors[s]).every(([k, v]) => k in o.colors && hex.test(v)));
+    if (!valid) return setMsg('look', "These settings can't be saved.");
+    const c = o.contrast;
+    if (['light', 'dark'].some((s) => c.pairs.some((p) => contrastRatio(look.colors[s][p.fg], look.colors[s][p.bg]) < c.min))) {
+      return setMsg('look', `Some colours are too hard to read to save. Anything below ${c.min}:1 needs changing.`);
+    }
+    const pick = (a) => ({ theme: a.theme, colors: a.colors, fonts: a.fonts, radius: a.radius, thumbnails: a.thumbnails });
+    const kept = pick(look);
+    const same = JSON.stringify(kept) === JSON.stringify(pick(state.admin.settings.appearance));
+    setLocalLook(same ? null : kept, same ? '' : renderLookCss(kept, o.fonts));
+    state.admin.look = savedLook(state.admin.settings);
+    drawLook();
+    setMsg('look', 'Saved in this browser only.', true);
   }
 
   async function uploadFavicon(form) {
@@ -2619,7 +2711,7 @@
         drawImport();
         break;
       case 'admin-look-undo':
-        state.admin.look = clone(state.admin.settings.appearance);
+        state.admin.look = savedLook(state.admin.settings);
         drawLook();
         break;
       case 'admin-look-defaults':
@@ -2794,6 +2886,7 @@
   Promise.all([loadRecipes(), loadSite()]).then(route);
   // Sign-in state is loaded separately so it never holds up the recipe list
   loadUser().then(() => {
+    if (localLook()) drawList(); // home-page photos as this browser saved them
     if (isAccountPage()) route();
     else drawAccount();
   });

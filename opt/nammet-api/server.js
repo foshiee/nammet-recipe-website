@@ -293,10 +293,7 @@ const routes = {
 
   'POST /api/admin/appearance': async (req, res) => {
     const user = requireAdmin(req);
-    const input = await readJson(req, 64 * 1024);
-    // The demo's visitors can change the look, but not put their own words on it
-    if (config.demo) Object.assign(input, { siteName: settings.appearance().siteName, favicon: settings.appearance().favicon });
-    await settings.saveAppearance(input);
+    await settings.saveAppearance(await readJson(req, 64 * 1024));
     console.log(`admin ${user.username}: changed the appearance`);
     send(res, 200, adminSettings());
   },
@@ -430,7 +427,7 @@ server.listen(config.port, config.host, () => {
   console.log(`nammet-api listening on http://${config.host}:${config.port}`);
   console.log(`recipes: ${path.resolve(config.recipesDir)}  photos: ${path.resolve(config.photosDir)}  users: ${path.resolve(config.usersFile)}`);
   console.log(`settings: ${path.resolve(config.settingsFile)}  theme: ${path.resolve(config.themeDir)}`);
-  if (config.demo) console.log('Demo mode: saving recipes and photos, the site name and icon, users, passwords, the API key and the model are read-only.');
+  if (config.demo) console.log('Demo mode: recipes, photos, the appearance, users, passwords, the API key and the model are read-only.');
   if (config.devStaticRoot) console.log(`dev mode: also serving ${path.resolve(config.devStaticRoot)}`);
   if (!settings.keyStatus().set) console.log('No Anthropic API key is set: PDF, photo and plain-text imports are disabled until one is added.');
 });
