@@ -73,6 +73,45 @@ test('colour themes and contrast', () => {
   assert.equal(settings.validateAppearance(unreadable, undefined, { checkContrast: false }).colors.dark.ink, '#20282c');
 });
 
+test('colourblind themes keep accent and errors apart', () => {
+  // Machado, Oliveira & Fernandes (2009) simulation matrices at full severity, for linear RGB
+  const SIM = {
+    protanopia: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+    deuteranopia: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
+    tritanopia: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]]
+  };
+  // Each theme and the types its label names
+  const COLOURBLIND = { 'blue-orange': ['protanopia', 'deuteranopia'], 'teal-crimson': ['tritanopia'] };
+
+  const linear = (hex) => [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  const simulate = (rgb, m) => m.map((row) => Math.min(1, Math.max(0, row[0] * rgb[0] + row[1] * rgb[1] + row[2] * rgb[2])));
+  const lab = ([r, g, b]) => {
+    const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+    const x = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+    const y = f(0.2126 * r + 0.7152 * g + 0.0722 * b);
+    const z = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+  };
+  const deltaE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
+
+  for (const [key, types] of Object.entries(COLOURBLIND)) {
+    assert.ok(settings.THEMES[key].label.includes(types[0]), key);
+    for (const scheme of ['light', 'dark']) {
+      const { accent, danger } = settings.THEMES[key].colors[scheme];
+      for (const type of types) {
+        const d = deltaE(simulate(linear(accent), SIM[type]), simulate(linear(danger), SIM[type]));
+        assert.ok(d >= 40, `${key} ${scheme} ${type}: accent and danger are ΔE ${d.toFixed(1)} apart`);
+      }
+      // Still apart without any colour vision
+      const ratio = settings.contrastRatio(accent, danger);
+      assert.ok(ratio >= 1.3, `${key} ${scheme}: accent and danger lightness ratio is ${ratio.toFixed(2)}`);
+    }
+  }
+});
+
 test('theme css and favicon', () => {
   const css = settings.renderThemeCss(settings.DEFAULT_APPEARANCE);
   assert.match(css, /--accent: #2447b8;/);

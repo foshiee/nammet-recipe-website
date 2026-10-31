@@ -30,7 +30,7 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 
 - Import from a recipe web page, PDF, cookbook photo or plain text.
 - Write or edit recipes in a form, with a live preview and photos.
-- An admin page for users, the site's look and the Claude model and API key.
+- An admin page for users, the site's look (including colourblind-friendly themes) and the Claude model and API key.
 
 ![The home page with pasta typed into the search box and the list filtered to pasta recipes](screenshots/search-desktop.webp)
 

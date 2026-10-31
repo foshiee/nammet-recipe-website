@@ -70,7 +70,7 @@ On a phone, the servings bar stays at the top of the screen while you cook:
 - Review every import before saving: a preview, an editor, and validation warnings such as quantities written into step text (which wouldn't scale).
 - Edit saved recipes from the recipe page, in a form or as raw JSON (the site remembers which you prefer). If someone else saves the recipe while you're editing, you're asked before anything is overwritten.
 - Add, crop and replace recipe photos. Photos are re-encoded in the browser, which strips EXIF and GPS data, and stripped again on the server.
-- An admin page for user accounts (admin and importer roles), the site name and favicon, colour themes with a contrast checker, fonts and corner radius, and the Claude model and API key.
+- An admin page for user accounts (admin and importer roles), the site name and favicon, colour themes (including colourblind-friendly ones) with a contrast checker, fonts and corner radius, and the Claude model and API key.
 
 Editing a saved recipe in the form, with a live preview beside it:
 
