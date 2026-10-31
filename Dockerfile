@@ -38,7 +38,9 @@ ENV RECIPES_DIR=/var/www/nammet/recipes \
     THEME_DIR=/var/www/nammet/theme \
     HOST=127.0.0.1 \
     PORT=3000 \
-    COOKIE_SECURE=true
+    COOKIE_SECURE=true \
+    DEMO_MODE=false \
+    DEMO_HINT=
 
 # theme/ needs no volume: the service rewrites it from settings.json at startup
 VOLUME ["/var/www/nammet/recipes", "/var/www/nammet/photos", "/var/lib/nammet"]

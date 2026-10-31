@@ -959,6 +959,7 @@ h2 {
 .user-name { flex: 1 1 10rem; font-weight: 600; overflow-wrap: anywhere; }
 .user .note { font-weight: 400; }
 .link-button.danger { color: var(--danger); }
+.link-button:disabled { opacity: .5; cursor: default; }
 
 .user-reset { display: grid; flex-basis: 100%; gap: .35rem; max-width: 22rem; }
 .user-reset label { font-weight: 600; }

@@ -76,6 +76,8 @@ Set these with `-e` or under `environment:` in the compose file.
 | `COOKIE_SECURE` | `true` | Keep it on. Turn it off only for a local trial. |
 | `SESSION_HOURS` | `168` | How long a sign-in lasts. |
 | `MAX_UPLOAD_MB`, `MAX_FETCH_MB` | `20`, `5` | Size limits for uploads and fetched web pages. |
+| `DEMO_MODE` | `false` | For a public demo with a shared admin login. See [below](#running-a-public-demo). |
+| `DEMO_HINT` | empty | Text shown on the sign-in screen, such as the demo login. Up to 200 characters, and public. |
 
 The other variables in [api.env.example](https://github.com/foshiee/nammet-recipe-website/blob/master/etc/nammet/api.env.example) are set by the image and shouldn't need changing.
 
@@ -93,6 +95,17 @@ To check, run `docker logs -f nammet` while loading the site. With `REAL_IP_FROM
 **Behind Cloudflare** as well, add Cloudflare's ranges (from [cloudflare.com/ips](https://www.cloudflare.com/ips/)) to `REAL_IP_FROM`, separated by commas.
 
 Don't publish the container's port anywhere but to the proxy. Docker's published ports go around host firewalls such as firewalld and ufw, so publish it on an address only the proxy can reach (for example `-p 127.0.0.1:8080:80` when the proxy runs on the host), or leave out `-p` and put the container on the proxy's Docker network.
+
+## Running a public demo
+
+`DEMO_MODE=true` makes it safe to hand out an admin login. Visitors can try everything: importing a recipe, editing it in the form or as JSON, and restyling the site. Nothing they write reaches anyone else, though. Imports only ever produce a draft in their browser, and the service refuses to save recipes or photos, change the appearance or site icon, manage users or passwords, set the API key, model or effort, or delete recipes. The photo editor still opens, but the photo isn't kept. Colours, fonts and corners can be saved, but only in the visitor's own browser. The site shows the refused controls disabled.
+
+1. Set `DEMO_MODE=true`, and `DEMO_HINT` to the login you're handing out, for example `Demo login: demo / Demo-pass-1234`.
+2. Create the demo user with a permanent password, since it can't be changed from the site: `docker exec -it nammet add-user demo --role admin --permanent`. The password can be piped in on stdin for a script.
+3. Leave `ANTHROPIC_API_KEY` empty, or use a key with a low spend limit set in the Anthropic console. Without a key, recipe files and most recipe sites still import. Lowering `MAX_UPLOAD_MB` helps too.
+4. Reset the site on a schedule, for example a nightly cron job that removes the container and its three volumes, starts it again and re-runs `add-user`. This puts back the look visitors changed and the recipes you want to show.
+
+Add the demo's recipes and photos before turning `DEMO_MODE` on, or copy them into the volumes, since the site can't save them once it's on.
 
 ## Updating
 

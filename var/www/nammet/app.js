@@ -22,6 +22,10 @@
     try { localStorage.setItem('recipes:' + key, value); } catch (e) { /* storage unavailable */ }
   };
 
+  const delPref = (key) => {
+    try { localStorage.removeItem('recipes:' + key); } catch (e) { /* storage unavailable */ }
+  };
+
   const trim = (n, digits) => String(parseFloat(n.toFixed(digits)));
 
   /* ---------- units ---------- */
@@ -178,6 +182,8 @@
     wakeWanted: false,
     user: null,
     userKnown: false,
+    demo: false, // DEMO_MODE on the server: user, password, key, model and delete changes are off
+    demoHint: '',
     imp: { busy: false, error: '', draft: null },
     edit: null, // the draft on #/edit/<slug>, kept apart so an import in progress survives
     editor: getPref('editor', 'form') === 'json' ? 'json' : 'form',
@@ -303,6 +309,61 @@
     } catch (e) { /* keep the defaults */ }
   }
 
+  // Demo mode keeps appearance changes in this browser, since the server refuses them.
+  // index.html applies the saved CSS before the page paints; the look refills the admin page.
+  function localLook() {
+    if (!state.demo) return null;
+    try { return JSON.parse(getPref('look', 'null')); } catch (e) { return null; }
+  }
+
+  const showThumbnails = () => {
+    const l = localLook();
+    return l ? l.thumbnails === true : state.site.thumbnails;
+  };
+
+  function setLocalLook(look, css) {
+    if (look) {
+      setPref('look', JSON.stringify(look));
+      setPref('look-css', css);
+    } else {
+      delPref('look');
+      delPref('look-css');
+    }
+    let el = document.getElementById('local-look');
+    if (!look) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'local-look';
+      document.head.appendChild(el); // after theme.css, so it wins
+    }
+    el.textContent = css;
+  }
+
+  // A copy of renderThemeCss in opt/nammet-api/settings.js; keep them alike
+  function renderLookCss(a, fonts) {
+    const vars = (colors, indent) => Object.entries(colors).map(([k, v]) => `${indent}--${k}: ${v};`).join('\n');
+    return `:root {
+${vars(a.colors.light, '  ')}
+  --font-heading: ${fonts[a.fonts.heading].stack};
+  --font-body: ${fonts[a.fonts.body].stack};
+  --radius: ${a.radius}px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+${vars(a.colors.dark, '    ')}
+  }
+}
+
+:root[data-theme="dark"] {
+${vars(a.colors.dark, '  ')}
+}
+`;
+  }
+
   const pageTitle = (sub) => { document.title = sub ? `${sub} | ${state.site.name}` : state.site.name; };
 
   /* ---------- home view ---------- */
@@ -348,8 +409,13 @@
   const mustChangePassword = () => !!state.user && !!state.user.mustChangePassword;
   const canImport = () => !!state.user && !mustChangePassword() && (state.user.role === 'admin' || state.user.role === 'importer');
   const isAdmin = () => !!state.user && !mustChangePassword() && state.user.role === 'admin';
+
+  // DEMO_MODE (demo.js on the server): the controls for what it refuses stay visible, disabled
+  const DEMO_REFUSED = 'Disabled in the demo.';
+  const demoOff = () => (state.demo ? ' disabled' : '');
+  const demoReason = (what) => (state.demo ? `<p class="hint">${esc(what)} turned off in the demo.</p>` : '');
   const accountLinksHtml = () =>
-    `Signed in as ${esc(state.user.username)} · ${isAdmin() ? '<a href="#/admin">Admin</a> · ' : ''}<a href="#/password">Change password</a> · <button class="link-button" data-action="logout">Sign out</button>`;
+    `Signed in as ${esc(state.user.username)} · ${isAdmin() ? '<a href="#/admin">Admin</a> · ' : ''}${state.demo ? '' : '<a href="#/password">Change password</a> · '}<button class="link-button" data-action="logout">Sign out</button>`;
 
   // Import is offered on the home page to importers and admins, as are the edit and photo
   // buttons on a recipe page. The footer (outside #app,
@@ -386,7 +452,7 @@
 
     // A photo beside each row that has one, when switched on in the admin page. Rows
     // without a photo look the same as with the setting off.
-    const thumb = (r) => state.site.thumbnails && r.image;
+    const thumb = (r) => showThumbnails() && r.image;
 
     list.innerHTML = shown.map((r) => `
       <li>
@@ -947,9 +1013,9 @@
       <div class="photo-tools">
         <a class="button secondary" href="#/edit/${encodeURIComponent(r.slug)}">Edit recipe</a>
         <button class="button secondary" data-action="pick-file" data-for="photo-file"${dis}>${r.image ? 'Change photo' : 'Add photo'}</button>
-        ${r.image ? `<button class="button secondary" data-action="photo-remove"${dis}>Remove photo</button>` : ''}
+        ${r.image ? `<button class="button secondary" data-action="photo-remove"${dis || demoOff()}>Remove photo</button>` : ''}
         <input id="photo-file" type="file" accept="image/*" data-action="photo-file" hidden>
-      </div>` : '') + (msg ? `<div class="photo-msg" aria-live="polite">${msg}</div>` : '');
+      </div>${demoReason('Saving photos is')}` : '') + (msg ? `<div class="photo-msg" aria-live="polite">${msg}</div>` : '');
   }
 
   // Runs a photo change for the open recipe; the page isn't redrawn, so timers keep going
@@ -983,7 +1049,14 @@
       drawPhotoTools();
       return;
     }
-    if (out && state.current === r) photoRequest((slug) => uploadPhoto(slug, out));
+    if (!out || state.current !== r) return;
+    // The demo lets visitors try the photo editor, but keeps nothing they upload
+    if (state.demo) {
+      state.photo.msg = { slug: r.slug, text: "Saving photos is turned off in the demo, so this one wasn't kept." };
+      drawPhotoTools();
+      return;
+    }
+    photoRequest((slug) => uploadPhoto(slug, out));
   }
 
   function removePhoto() {
@@ -1018,7 +1091,11 @@
 
   async function loadUser() {
     try {
-      state.user = (await api('me')).user;
+      const me = await api('me');
+      state.user = me.user;
+      state.demo = !!me.demo;
+      state.demoHint = me.demoHint || '';
+      if (!state.demo) setLocalLook(null); // left over from when this site was a demo
     } catch (e) {
       state.user = null;
     }
@@ -1055,6 +1132,7 @@
         <a class="back" href="#/">All recipes</a>
         <h1>Sign in</h1>
         <p class="lede">${esc(lede)}</p>
+        ${state.demoHint ? `<div class="notice"><p>${esc(state.demoHint)}</p></div>` : ''}
         <form class="login" data-action="login">
           <label for="login-user">User name</label>
           <input id="login-user" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
@@ -1080,6 +1158,15 @@
     }
     const forced = mustChangePassword();
     pageTitle(forced ? 'Choose a password' : 'Change password');
+    if (state.demo && !forced) {
+      app.innerHTML = `
+        <section class="import">
+          <a class="back" href="#/">All recipes</a>
+          <h1>Change password</h1>
+          <div class="notice"><p>Changing the password is turned off in the demo, since everyone shares this login.</p></div>
+        </section>`;
+      return;
+    }
     app.innerHTML = `
       <section class="import">
         <a class="back" href="#/">All recipes</a>
@@ -1496,17 +1583,19 @@
         <label for="imp-slug">File name</label>
         <div class="slug-field"><input id="imp-slug" value="${esc(d.slug)}" autocapitalize="none" spellcheck="false"><span>.json</span></div>
         <p class="hint">Lowercase letters, numbers and hyphens. This becomes the recipe's address, so pick it once.</p>
+        ${demoReason('Saving is')}
         <div class="actions">
-          <button class="button" data-action="imp-save"${d.saving ? ' disabled' : ''}>Save recipe</button>
+          <button class="button" data-action="imp-save"${d.saving || state.demo ? ' disabled' : ''}>Save recipe</button>
           <button class="button secondary" data-action="imp-reset">Start over</button>
         </div>` : `
         <p class="field-label">File name</p>
         <p>${esc(d.slug)}.json</p>
         <p class="hint">The file name is the recipe's address, so it stays the same. Change the photo on the recipe page.</p>
+        ${demoReason('Saving is')}
         <div class="actions">
-          <button class="button" data-action="imp-save"${d.saving ? ' disabled' : ''}>Save changes</button>
+          <button class="button" data-action="imp-save"${d.saving || state.demo ? ' disabled' : ''}>Save changes</button>
           <button class="button secondary" data-action="edit-discard">Discard changes</button>
-          ${isAdmin() ? `<button class="button secondary danger" data-action="edit-delete"${d.saving ? ' disabled' : ''}>Delete recipe</button>` : ''}
+          ${isAdmin() && !state.demo ? `<button class="button secondary danger" data-action="edit-delete"${d.saving ? ' disabled' : ''}>Delete recipe</button>` : ''}
         </div>`;
     return `
       ${intro}
@@ -1715,7 +1804,7 @@
     const box = document.getElementById('save-status');
     if (box && d) box.innerHTML = saveStatusHtml(d);
     for (const btn of app.querySelectorAll('[data-action="imp-save"], [data-action="edit-delete"]')) {
-      if (d) btn.disabled = d.saving;
+      if (d) btn.disabled = d.saving || state.demo;
     }
   }
 
@@ -1960,6 +2049,8 @@
   // `look`, the appearance as edited on the page, which is previewed live until saved.
 
   const clone = (v) => JSON.parse(JSON.stringify(v));
+  // The look the admin page starts from and goes back to: the site's, or this browser's in demo mode
+  const savedLook = (settings) => ({ ...clone(settings.appearance), ...(localLook() || {}) });
   const ROLE_TEXT = { admin: 'Admin', importer: 'Importer' };
 
   function showAdmin() {
@@ -1993,7 +2084,7 @@
   async function loadAdmin() {
     try {
       const [settings, users] = await Promise.all([api('admin/settings'), api('admin/users')]);
-      state.admin = { settings, users: users.users, look: clone(settings.appearance), resetFor: null };
+      state.admin = { settings, users: users.users, look: savedLook(settings), resetFor: null };
       drawAdmin();
     } catch (e) {
       if (e.status === 401 || e.status === 403) return adminError(e);
@@ -2004,6 +2095,8 @@
 
   // Signed out, or no longer an admin: find out who we are now and redraw.
   function adminError(e, section) {
+    // Refused by DEMO_MODE (a page loaded before it was on): just say so
+    if (e.status === 403 && e.message === DEMO_REFUSED) return setMsg(section, e.message);
     if (e.status === 401 || e.status === 403) {
       if (e.status === 401) state.imp.error = 'Your session ended. Sign in again.';
       state.admin = null;
@@ -2020,7 +2113,7 @@
 
   // Runs a request with the form's buttons disabled; errors land in the section's message line.
   async function adminRequest(form, section, fn) {
-    const buttons = form ? [...form.querySelectorAll('button')] : [];
+    const buttons = form ? [...form.querySelectorAll('button:not(:disabled)')] : []; // leaves demo-disabled ones alone
     buttons.forEach((b) => { b.disabled = true; });
     setMsg(section, '');
     try {
@@ -2036,6 +2129,7 @@
     const body = document.getElementById('admin-body');
     if (!body || !state.admin) return;
     body.innerHTML = `
+      ${state.demo ? '<div class="notice"><p><strong>Demo mode:</strong> try anything. Colours, fonts and corners are saved in this browser only. Saving recipes and photos, the site name and icon, users, passwords, the API key and the model are turned off. The site resets regularly.</p></div>' : ''}
       <section class="admin-section" aria-labelledby="ad-look-h"><h2 id="ad-look-h">Appearance</h2><div id="admin-look"></div></section>
       <section class="admin-section" aria-labelledby="ad-ai-h"><h2 id="ad-ai-h">Claude</h2><div id="admin-ai"></div></section>
       <section class="admin-section" aria-labelledby="ad-users-h"><h2 id="ad-users-h">Users</h2><div id="admin-users"></div></section>`;
@@ -2064,15 +2158,16 @@
         <span>${esc(o.themes[k].label)}</span></label>`).join('');
 
     box.innerHTML = `
-      <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. Visitors see them once you save.</p>
+      <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. ${state.demo ? 'In the demo, saving keeps them in this browser only.' : 'Visitors see them once you save.'}</p>
       <form class="admin-form" data-action="admin-look">
         <label for="ad-name">Site name</label>
-        <input id="ad-name" name="siteName" maxlength="60" required value="${esc(look.siteName)}">
+        <input id="ad-name" name="siteName" maxlength="60" required value="${esc(look.siteName)}"${demoOff()}>
         <p class="hint">Shown as the home page heading and in the browser tab.</p>
+        ${demoReason('Changing the site name and icon is')}
         <label for="ad-emoji">Site icon</label>
         <div class="icon-row">
           ${image ? `<img class="icon-preview" src="${esc(document.getElementById('favicon').getAttribute('href'))}" alt="Current icon" width="32" height="32">` : ''}
-          <input id="ad-emoji" name="emoji" value="${image ? '' : esc(look.favicon.value)}" placeholder="${image ? 'Using the uploaded image' : ''}">
+          <input id="ad-emoji" name="emoji"${demoOff()} value="${image ? '' : esc(look.favicon.value)}" placeholder="${image ? 'Using the uploaded image' : ''}">
         </div>
         <p class="hint">An emoji, or a letter or two.${image ? ' Leave it empty to keep the uploaded image.' : ''} To use a picture instead, upload one below.</p>
         <fieldset class="themes"><legend>Colour theme</legend>${themes}</fieldset>
@@ -2106,9 +2201,9 @@
       </form>
       <form class="admin-form" data-action="admin-favicon">
         <label for="ad-icon-file">Upload an icon</label>
-        <input id="ad-icon-file" type="file" name="file" accept=".png,.ico,.webp,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp">
+        <input id="ad-icon-file" type="file" name="file"${demoOff()} accept=".png,.ico,.webp,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp">
         <p class="hint">PNG, ICO or WebP, under 256 KB. Square images work best. It replaces the emoji as soon as it's uploaded.</p>
-        <div class="actions"><button class="button secondary" type="submit">Upload icon</button></div>
+        <div class="actions"><button class="button secondary" type="submit"${demoOff()}>Upload icon</button></div>
         <div id="msg-icon" aria-live="polite"></div>
       </form>`;
     previewLook();
@@ -2225,6 +2320,7 @@
 
   async function saveLook(form) {
     const look = readLook(form);
+    if (state.demo) return saveLocalLook(look);
     if (look.favicon.type === 'emoji' && !look.favicon.value) {
       setMsg('look', 'Choose an emoji for the site icon, or upload an image.');
       return;
@@ -2238,6 +2334,28 @@
       drawLook();
       setMsg('look', 'Saved. Visitors see the new look the next time they load the site.', true);
     });
+  }
+
+  // Demo mode: the same checks as the server, then into this browser's storage. A look
+  // that matches the site's just clears what was saved.
+  function saveLocalLook(look) {
+    const o = state.admin.settings.options;
+    const hex = /^#[0-9a-f]{6}$/i;
+    const valid = o.themes[look.theme] && o.fonts[look.fonts.heading] && o.fonts[look.fonts.body] &&
+      Number.isInteger(look.radius) && look.radius >= o.radius.min && look.radius <= o.radius.max &&
+      ['light', 'dark'].every((s) => Object.entries(look.colors[s]).every(([k, v]) => k in o.colors && hex.test(v)));
+    if (!valid) return setMsg('look', "These settings can't be saved.");
+    const c = o.contrast;
+    if (['light', 'dark'].some((s) => c.pairs.some((p) => contrastRatio(look.colors[s][p.fg], look.colors[s][p.bg]) < c.min))) {
+      return setMsg('look', `Some colours are too hard to read to save. Anything below ${c.min}:1 needs changing.`);
+    }
+    const pick = (a) => ({ theme: a.theme, colors: a.colors, fonts: a.fonts, radius: a.radius, thumbnails: a.thumbnails });
+    const kept = pick(look);
+    const same = JSON.stringify(kept) === JSON.stringify(pick(state.admin.settings.appearance));
+    setLocalLook(same ? null : kept, same ? '' : renderLookCss(kept, o.fonts));
+    state.admin.look = savedLook(state.admin.settings);
+    drawLook();
+    setMsg('look', 'Saved in this browser only.', true);
   }
 
   async function uploadFavicon(form) {
@@ -2269,7 +2387,7 @@
     const status = !k.set ? 'not set, so PDF, photo and pasted-text imports are switched off.'
       : `set${k.last4 ? `, ending in …${k.last4}` : ''} (${k.source === 'admin' ? 'saved on this page' : "from the server's api.env file"}).`;
     const select = (name, list, value, fallback) => `
-      <select id="ad-${name}" name="${name}">
+      <select id="ad-${name}" name="${name}"${demoOff()}>
         <option value="">Server default (${esc(fallback)})</option>
         ${list.map((v) => `<option value="${esc(v)}"${v === value ? ' selected' : ''}>${esc(v)}</option>`).join('')}
       </select>`;
@@ -2281,12 +2399,13 @@
       <form class="admin-form" data-action="admin-key" autocomplete="off">
         <p class="key-status"><strong>API key:</strong> ${esc(status)}</p>
         <label for="ad-key">${k.set ? 'Replace the key' : 'Add a key'}</label>
-        <input id="ad-key" name="key" type="password" required data-secret autocomplete="off" autocapitalize="none" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="sk-ant-…">
+        <input id="ad-key" name="key" type="password" required${demoOff()} data-secret autocomplete="off" autocapitalize="none" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="sk-ant-…">
         <p class="hint">Stored on the server and never shown again. A key saved here takes priority over api.env.</p>
+        ${demoReason('Changing the key is')}
         <div class="actions">
-          <button class="button" type="submit">Save key</button>
+          <button class="button" type="submit"${demoOff()}>Save key</button>
           ${k.set ? '<button class="button secondary" type="button" data-action="admin-key-test">Test key</button>' : ''}
-          ${k.source === 'admin' ? '<button class="button secondary" type="button" data-action="admin-key-remove">Remove key</button>' : ''}
+          ${k.source === 'admin' ? `<button class="button secondary" type="button" data-action="admin-key-remove"${demoOff()}>Remove key</button>` : ''}
         </div>
         <div id="msg-key" aria-live="polite"></div>
       </form>
@@ -2296,7 +2415,8 @@
         <label for="ad-effort">Effort</label>
         ${select('effort', o.efforts, ai.effort, ai.defaults.effort)}
         <p class="hint">Haiku costs about a twentieth of Sonnet and suits clear pages and typed text. Opus is more accurate on blurry photos and messy PDFs, at about twice the price of Sonnet. Higher effort is slower and costs more.</p>
-        <div class="actions"><button class="button" type="submit">Save</button></div>
+        ${demoReason('Changing the model and effort is')}
+        <div class="actions"><button class="button" type="submit"${demoOff()}>Save</button></div>
         <div id="msg-ai" aria-live="polite"></div>
       </form>`;
   }
@@ -2350,6 +2470,7 @@
 
     box.innerHTML = `
       <p class="hint">Admins can use this page and import recipes. Importers can only import recipes. Visitors don't need an account.</p>
+      ${demoReason('Adding, changing and removing users is')}
       <ul class="users">
         ${a.users.map((u) => {
           const me = u.username === state.user.username;
@@ -2357,9 +2478,9 @@
           return `
           <li class="user">
             <span class="user-name">${name}${me ? ' <span class="note">(you)</span>' : ''}${u.mustChangePassword ? ' <span class="note">(temporary password)</span>' : ''}</span>
-            <select data-action="user-role" data-user="${name}" aria-label="Role for ${name}">${roleOptions(u.role)}</select>
-            <button class="link-button" data-action="user-reset-open" data-user="${name}">Reset password</button>
-            ${me ? '' : `<button class="link-button danger" data-action="user-delete" data-user="${name}">Remove</button>`}
+            <select data-action="user-role" data-user="${name}" aria-label="Role for ${name}"${demoOff()}>${roleOptions(u.role)}</select>
+            <button class="link-button" data-action="user-reset-open" data-user="${name}"${demoOff()}>Reset password</button>
+            ${me ? '' : `<button class="link-button danger" data-action="user-delete" data-user="${name}"${demoOff()}>Remove</button>`}
             ${a.resetFor === u.username ? `
               <form class="user-reset" data-action="user-reset" data-user="${name}">
                 <label for="ad-reset">New password for ${name}</label>
@@ -2376,14 +2497,14 @@
       <form class="admin-form" data-action="user-add">
         <h3>Add a user</h3>
         <label for="ad-new-user">User name</label>
-        <input id="ad-new-user" name="username" maxlength="32" required autocomplete="off" autocapitalize="none" spellcheck="false">
+        <input id="ad-new-user" name="username" maxlength="32" required${demoOff()} autocomplete="off" autocapitalize="none" spellcheck="false">
         <p class="hint">Lowercase letters, numbers, ".", "_" or "-".</p>
         <label for="ad-new-pass">Password</label>
-        <input id="ad-new-pass" name="password" type="password" minlength="12" required autocomplete="new-password" data-secret>
+        <input id="ad-new-pass" name="password" type="password" minlength="12" required${demoOff()} autocomplete="new-password" data-secret>
         <p class="hint">At least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Share it with them privately. They'll choose their own when they first sign in.</p>
         <label for="ad-new-role">Role</label>
-        <select id="ad-new-role" name="role">${roleOptions('importer')}</select>
-        <div class="actions"><button class="button" type="submit">Add user</button></div>
+        <select id="ad-new-role" name="role"${demoOff()}>${roleOptions('importer')}</select>
+        <div class="actions"><button class="button" type="submit"${demoOff()}>Add user</button></div>
         <div id="msg-useradd" aria-live="polite"></div>
       </form>`;
   }
@@ -2590,7 +2711,7 @@
         drawImport();
         break;
       case 'admin-look-undo':
-        state.admin.look = clone(state.admin.settings.appearance);
+        state.admin.look = savedLook(state.admin.settings);
         drawLook();
         break;
       case 'admin-look-defaults':
@@ -2765,6 +2886,7 @@
   Promise.all([loadRecipes(), loadSite()]).then(route);
   // Sign-in state is loaded separately so it never holds up the recipe list
   loadUser().then(() => {
+    if (localLook()) drawList(); // home-page photos as this browser saved them
     if (isAccountPage()) route();
     else drawAccount();
   });

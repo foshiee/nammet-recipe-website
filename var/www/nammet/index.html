@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="style.css">
   <!-- Written by the admin page (opt/nammet-api/settings.js); overrides the variables in style.css -->
   <link id="theme-css" rel="stylesheet" href="theme/theme.css">
+  <!-- Demo mode only: a look saved in this browser (saveLook in app.js), applied after theme.css -->
+  <script>try{var c=localStorage.getItem('recipes:look-css');if(c){var s=document.createElement('style');s.id='local-look';s.textContent=c;document.head.appendChild(s)}}catch(e){}</script>
 </head>
 <body>
   <main id="app" class="page">

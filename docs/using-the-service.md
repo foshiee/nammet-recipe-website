@@ -17,6 +17,10 @@ Visitors see no sign of the import feature apart from a small **Sign in** link a
 
 There are two roles. **Admins** can do everything. **Importers** can only import and edit recipes and change their photos. Visitors don't need an account. The server checks the role on every request, so hidden buttons are not the only protection. The site always keeps at least one admin: the last one can't be removed or demoted.
 
+## Demo mode
+
+A server started with `DEMO_MODE=true` is a public demo with a shared admin login, so nothing a visitor writes is kept. Importing and editing work up to the preview, the photo editor opens but its photo isn't kept, and the admin page's colours, fonts and corners are saved in the visitor's own browser only. Saving recipes and photos, the appearance, the site name and icon, users, passwords, the API key, the model and effort, and deleting recipes are turned off, and their buttons show as disabled. See [docker.md](docker.md#running-a-public-demo) for setting one up.
+
 ## Passwords
 
 A password set for someone else, whether on the admin page or with the command-line tool, is temporary. At their first sign-in they're asked to choose their own, and they can't do anything else until they have. Anyone signed in can also change their password at any time with **Change password** next to **Sign out**.
