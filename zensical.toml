@@ -1,7 +1,7 @@
 [project]
 site_name = "Nammet Recipe Website"
 site_description = "A self-hosted recipe website: plain JSON recipes, a vanilla JavaScript front end and nginx."
-site_url = "https://foshiee.github.io/nammet-recipe-website/"
+site_url = "https://docs.nammet.app/"
 repo_url = "https://github.com/foshiee/nammet-recipe-website"
 docs_dir = "docs"
 site_dir = "site"
