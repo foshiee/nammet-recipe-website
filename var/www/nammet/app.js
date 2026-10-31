@@ -188,7 +188,7 @@
     edit: null, // the draft on #/edit/<slug>, kept apart so an import in progress survives
     editor: getPref('editor', 'form') === 'json' ? 'json' : 'form',
     theme: ['light', 'dark'].includes(getPref('theme', '')) ? getPref('theme', '') : 'system',
-    site: { name: 'Recipes', thumbnails: false },
+    site: { name: 'Nammet Recipes', thumbnails: false },
     photo: { busy: false, msg: null },
     admin: null
   };

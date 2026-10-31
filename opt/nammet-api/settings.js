@@ -154,7 +154,7 @@ export const EFFORTS = ['low', 'medium', 'high'];
 
 // Matches the defaults at the top of style.css.
 export const DEFAULT_APPEARANCE = {
-  siteName: 'Recipes',
+  siteName: 'Nammet Recipes',
   favicon: { type: 'emoji', value: '🍲' },
   theme: 'sea-glass',
   colors: structuredClone(THEMES['sea-glass'].colors),
