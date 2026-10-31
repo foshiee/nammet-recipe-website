@@ -2155,7 +2155,7 @@ ${vars(a.colors.dark, '  ')}
     const themes = Object.keys(o.themes).map((k) => `
       <label class="theme-card"><input type="radio" name="theme" value="${esc(k)}"${k === look.theme ? ' checked' : ''}>
         <span class="theme-samples">${sample(o.themes[k].colors.light)}${sample(o.themes[k].colors.dark)}</span>
-        <span>${esc(o.themes[k].label)}</span></label>`).join('');
+        <span>${esc(o.themes[k].label)}${o.themes[k].note ? `<small class="theme-note">${esc(o.themes[k].note)}</small>` : ''}</span></label>`).join('');
 
     box.innerHTML = `
       <p class="hint">Changes show on this page as you make them; colours preview in the mode your device is using. ${state.demo ? 'In the demo, saving keeps them in this browser only.' : 'Visitors see them once you save.'}</p>

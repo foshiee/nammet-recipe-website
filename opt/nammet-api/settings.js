@@ -82,16 +82,18 @@ export const THEMES = {
       dark: { bg: '#000000', ink: '#ffffff', muted: '#cfcfcf', line: '#8a8a8a', accent: '#9db8ff', 'on-accent': '#000000', tint: '#1a2850', field: '#0a0a0a', danger: '#ff8a80' }
     }
   },
-  // For colour blindness: accent and errors stay apart in hue and lightness for the types named (the tests check)
+  // For colour blindness: accent and errors stay apart in hue and lightness for the types in `note` (the tests check)
   'blue-orange': {
-    label: 'Blue & orange (protanopia, deuteranopia)',
+    label: 'Blue & orange',
+    note: 'Protanopia, deuteranopia',
     colors: {
       light: { bg: '#f3f5f8', ink: '#15202b', muted: '#55606b', line: '#cdd5de', accent: '#0a4f9e', 'on-accent': '#ffffff', tint: '#dce8f6', field: '#ffffff', danger: '#b04000' },
       dark: { bg: '#0f141a', ink: '#e9eef3', muted: '#9eabb8', line: '#2b3540', accent: '#a8d1ff', 'on-accent': '#0f141a', tint: '#1a2c44', field: '#151b22', danger: '#f08a3c' }
     }
   },
   'teal-crimson': {
-    label: 'Teal & crimson (tritanopia)',
+    label: 'Teal & crimson',
+    note: 'Tritanopia',
     colors: {
       light: { bg: '#f2f5f5', ink: '#142222', muted: '#536565', line: '#c9d6d6', accent: '#00736f', 'on-accent': '#ffffff', tint: '#d3ecea', field: '#ffffff', danger: '#9a0030' },
       dark: { bg: '#0e1616', ink: '#e6f0ef', muted: '#9db0ae', line: '#283a3a', accent: '#5fd4cf', 'on-accent': '#0e1616', tint: '#173434', field: '#131d1d', danger: '#ff7a9c' }
