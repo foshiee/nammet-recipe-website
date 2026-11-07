@@ -174,6 +174,7 @@
     units: getPref('units', 'us') === 'metric' ? 'metric' : 'us',
     query: '',
     tag: null,
+    tagsOpen: false, // the home page shows only the most-used tags until opened
     current: null,
     servings: 1,
     checked: new Set(),
@@ -430,13 +431,25 @@ ${vars(a.colors.dark, '  ')}
       : '<a href="#/import">Sign in</a>';
   }
 
+  // Most-used tags first. A long list is cut to TAG_LIMIT behind a "more" button (hiding
+  // only one or two isn't worth it), and the selected tag always stays visible.
+  const TAG_LIMIT = 12;
+
   function drawTags() {
     const box = document.getElementById('tags');
     if (!box) return;
-    const tags = [...new Set(state.recipes.flatMap((r) => r.tags))].sort();
-    box.innerHTML = tags
+    const counts = new Map();
+    for (const t of state.recipes.flatMap((r) => r.tags)) counts.set(t, (counts.get(t) || 0) + 1);
+    const tags = [...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a) || a.localeCompare(b));
+    const long = tags.length > TAG_LIMIT + 2;
+    const shown = !long || state.tagsOpen ? tags
+      : tags.filter((t, i) => i < TAG_LIMIT || t === state.tag);
+    const more = long
+      ? `<button class="tag tag-more" data-action="more-tags" aria-expanded="${state.tagsOpen}">${state.tagsOpen ? 'Fewer tags' : `+ ${tags.length - shown.length} more`}</button>`
+      : '';
+    box.innerHTML = shown
       .map((t) => `<button class="tag" data-action="tag" data-tag="${esc(t)}" aria-pressed="${state.tag === t}">${esc(t)}</button>`)
-      .join('');
+      .join('') + more;
   }
 
   function drawList() {
@@ -2661,6 +2674,10 @@ ${vars(a.colors.dark, '  ')}
         state.tag = state.tag === el.dataset.tag ? null : el.dataset.tag;
         drawTags();
         drawList();
+        break;
+      case 'more-tags':
+        state.tagsOpen = !state.tagsOpen;
+        drawTags();
         break;
       case 'clear': {
         state.query = '';

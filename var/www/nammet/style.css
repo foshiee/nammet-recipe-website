@@ -206,6 +206,8 @@ h1 {
   cursor: pointer;
 }
 
+.tag-more { border-style: dashed; color: var(--muted); }
+
 .tag[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);

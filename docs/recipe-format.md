@@ -146,7 +146,7 @@ The home page can show a small copy of each photo beside the recipe's name. An a
 
 ## What the home page uses
 
-The home page lists recipes alphabetically by `title`. Each row shows the title, `description`, `servings` and `time`, and the `image` when photos on the home page are turned on. Search matches against the title, description, tags and every ingredient name, and a search with several words requires all of them to match. Tag buttons narrow the list to recipes carrying that tag.
+The home page lists recipes alphabetically by `title`. Each row shows the title, `description`, `servings` and `time`, and the `image` when photos on the home page are turned on. Search matches against the title, description, tags and every ingredient name, and a search with several words requires all of them to match. Tag buttons narrow the list to recipes carrying that tag. They're ordered by how many recipes use them, and when there are many, only the most-used show until "more" is pressed.
 
 ## JSON syntax rules
 
