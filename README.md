@@ -10,8 +10,6 @@ An optional Node service adds sign-in, recipe import (from a file, a web page or
 
 ## Screenshots
 
-The light and dark shots follow your GitHub theme, as the site follows your system's unless you pick one.
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/recipe-desktop-dark.webp">
   <img src="docs/screenshots/recipe-desktop.webp" alt="A recipe page: a photo of the dish, the title and description, and a bar with servings and US/metric controls">
