@@ -827,7 +827,8 @@ h2 {
 }
 
 /* Photo editor: a modal with a 3:2 frame, the shape of the recipe page's photo */
-.cropper {
+.cropper,
+.ask {
   width: min(40rem, calc(100vw - 2rem));
   max-width: none;
   max-height: calc(100vh - 2rem);
@@ -839,8 +840,15 @@ h2 {
   box-shadow: var(--shadow-dialog);
 }
 
-.cropper::backdrop { background: rgb(0 0 0 / .55); }
-.cropper .actions { margin-top: 20px; }
+.cropper::backdrop,
+.ask::backdrop { background: rgb(0 0 0 / .55); }
+.cropper .actions,
+.ask .actions { margin-top: 20px; }
+
+/* The in-page stand-in for confirm() */
+.ask { width: min(28rem, calc(100vw - 2rem)); }
+.ask p { margin: 0; }
+.ask .actions .button.danger { margin-left: 0; }
 
 .crop-frame {
   margin-top: 16px;
