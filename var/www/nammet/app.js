@@ -869,6 +869,42 @@ ${vars(a.colors.dark, '  ')}
     e.resolve(result);
   }
 
+  /* confirmation: an in-page stand-in for confirm(), which some embedded browsers answer
+     "no" without showing */
+
+  // asking = { dialog, resolve }
+  let asking = null;
+
+  // Resolves true for the OK button, false for Cancel, Escape or leaving the page.
+  // `danger` styles OK as destructive and starts the focus on Cancel.
+  function ask(message, { ok = 'OK', danger = false } = {}) {
+    closeAsk(false);
+    const dialog = document.createElement('dialog');
+    dialog.className = 'ask';
+    dialog.setAttribute('aria-labelledby', 'ask-msg');
+    dialog.innerHTML = `
+      <p id="ask-msg">${esc(message)}</p>
+      <div class="actions">
+        <button class="button${danger ? ' secondary danger' : ''}" data-action="ask-ok">${esc(ok)}</button>
+        <button class="button secondary" data-action="ask-cancel">Cancel</button>
+      </div>`;
+    app.appendChild(dialog);
+    return new Promise((resolve) => {
+      asking = { dialog, resolve };
+      dialog.showModal();
+      dialog.querySelector(danger ? '[data-action="ask-cancel"]' : '[data-action="ask-ok"]').focus();
+    });
+  }
+
+  function closeAsk(result) {
+    const a = asking;
+    if (!a) return;
+    asking = null;
+    if (a.dialog.open) a.dialog.close();
+    a.dialog.remove();
+    a.resolve(result);
+  }
+
   // Frame size in CSS pixels, and photo pixels per CSS pixel at the current zoom. The
   // height comes from the ratio rather than the layout, so the crop is exactly 3:2.
   function cropView() {
@@ -1074,8 +1110,8 @@ ${vars(a.colors.dark, '  ')}
     photoRequest((slug) => uploadPhoto(slug, out));
   }
 
-  function removePhoto() {
-    if (confirm('Remove the photo from this recipe?')) photoRequest((slug) => api('recipes/photo/delete', { method: 'POST', json: { slug } }));
+  async function removePhoto() {
+    if (await ask('Remove the photo from this recipe?', { ok: 'Remove photo', danger: true })) photoRequest((slug) => api('recipes/photo/delete', { method: 'POST', json: { slug } }));
   }
 
   /* ---------- sign-in & import ---------- */
@@ -1353,6 +1389,14 @@ ${vars(a.colors.dark, '  ')}
     const d = state.imp.draft;
     if (d && d.photo) URL.revokeObjectURL(d.photo.url);
     state.imp = { busy: false, error: '', draft: null };
+  }
+
+  // "Start over" on the import screen
+  async function resetImport() {
+    const d = state.imp.draft;
+    if (d && d.dirty && (!await ask('Discard this recipe?', { ok: 'Discard recipe', danger: true }) || state.imp.draft !== d)) return;
+    clearImport();
+    drawImport();
   }
 
   // `source` is the original file, kept so "Adjust photo" can recrop it from scratch.
@@ -1752,12 +1796,17 @@ ${vars(a.colors.dark, '  ')}
 
   const FOCUS_FIELD = { groups: 'name', items: 'amount', steps: 'text', notes: '' };
 
-  function formChange(el) {
+  async function formChange(el) {
     const d = currentDraft();
     if (!d || d.view !== 'form') return;
-    const { list, path } = formList(d.form, el);
     const kind = el.dataset.list;
     const i = Number(el.dataset.i);
+    if (el.dataset.action === 'form-remove' && kind === 'groups' && formList(d.form, el).list[i].items.some((it) => it.name.trim())) {
+      if (!await ask('Remove this group and its ingredients?', { ok: 'Remove group', danger: true })) return;
+      // The draft may have moved on while the question was open
+      if (currentDraft() !== d || d.view !== 'form' || !document.body.contains(el)) return;
+    }
+    const { list, path } = formList(d.form, el);
     let focus;
     if (el.dataset.action === 'form-add') {
       list.push(blank[kind]());
@@ -1768,7 +1817,6 @@ ${vars(a.colors.dark, '  ')}
       [list[i], list[j]] = [list[j], list[i]];
       focus = j;
     } else {
-      if (kind === 'groups' && list[i].items.some((it) => it.name.trim()) && !confirm('Remove this group and its ingredients?')) return;
       list.splice(i, 1);
     }
     d.dirty = true;
@@ -1898,9 +1946,10 @@ ${vars(a.colors.dark, '  ')}
     drawReview();
   }
 
-  function discardEdit() {
+  async function discardEdit() {
     const d = state.edit;
-    if (!d || (d.dirty && !confirm('Discard your changes to this recipe?'))) return;
+    if (!d) return;
+    if (d.dirty && (!await ask('Discard your changes to this recipe?', { ok: 'Discard changes', danger: true }) || state.edit !== d)) return;
     state.edit = null;
     location.hash = '#/r/' + encodeURIComponent(d.slug);
   }
@@ -1912,7 +1961,8 @@ ${vars(a.colors.dark, '  ')}
     if (!d || d.saving || !isAdmin()) return;
     const saved = state.recipes.find((x) => x.slug === d.slug);
     const name = saved ? saved.title : d.slug;
-    if (!confirm(`Delete "${name}"? This removes the recipe and its photo for everyone, and can't be undone.`)) return;
+    if (!await ask(`Delete "${name}"? This removes the recipe and its photo for everyone, and can't be undone.`, { ok: 'Delete recipe', danger: true })) return;
+    if (state.edit !== d || d.saving) return;
     d.conflict = false;
     d.changed = false;
     d.saveMsg = '';
@@ -1946,9 +1996,9 @@ ${vars(a.colors.dark, '  ')}
     location.hash = '#/';
   }
 
-  function reloadEdit() {
+  async function reloadEdit() {
     const d = state.edit;
-    if (!d || !confirm('Load the saved version? Your changes will be lost.')) return;
+    if (!d || !await ask('Load the saved version? Your changes will be lost.', { ok: 'Load saved version', danger: true }) || state.edit !== d) return;
     state.edit = null;
     showEdit(d.slug);
   }
@@ -2449,7 +2499,7 @@ ${vars(a.colors.dark, '  ')}
   }
 
   async function removeKey(btn) {
-    if (!confirm('Remove the API key saved on this page?')) return;
+    if (!await ask('Remove the API key saved on this page?', { ok: 'Remove key', danger: true })) return;
     await adminRequest(btn.closest('form'), 'key', async () => {
       state.admin.settings = await api('admin/api-key', { method: 'POST', json: { key: '' } });
       drawAi();
@@ -2528,7 +2578,7 @@ ${vars(a.colors.dark, '  ')}
     const username = select.dataset.user;
     const role = select.value;
     const me = username === state.user.username;
-    if (me && role !== 'admin' && !confirm("You'll lose access to this page. Continue?")) {
+    if (me && role !== 'admin' && !await ask("You'll lose access to this page. Continue?", { ok: 'Change my role', danger: true })) {
       drawUsers();
       return;
     }
@@ -2564,7 +2614,7 @@ ${vars(a.colors.dark, '  ')}
 
   async function deleteUser(btn) {
     const username = btn.dataset.user;
-    if (!confirm(`Remove ${username}? They'll be signed out straight away.`)) return;
+    if (!await ask(`Remove ${username}? They'll be signed out straight away.`, { ok: 'Remove user', danger: true })) return;
     await adminRequest(null, 'users', async () => {
       const data = await api('admin/users/delete', { method: 'POST', json: { username } });
       state.admin.users = data.users;
@@ -2601,6 +2651,7 @@ ${vars(a.colors.dark, '  ')}
 
   function route() {
     closeEditor(null);
+    closeAsk(false);
     leaveRecipe();
     clearPreview();
     const m = location.hash.match(/^#\/r\/(.+)$/);
@@ -2724,11 +2775,9 @@ ${vars(a.colors.dark, '  ')}
       case 'imp-save': saveDraft(false); break;
       case 'imp-overwrite': saveDraft(true); break;
       case 'imp-new': newRecipe(); break;
-      case 'imp-reset':
-        if (state.imp.draft && state.imp.draft.dirty && !confirm('Discard this recipe?')) break;
-        clearImport();
-        drawImport();
-        break;
+      case 'imp-reset': resetImport(); break;
+      case 'ask-ok': closeAsk(true); break;
+      case 'ask-cancel': closeAsk(false); break;
       case 'admin-look-undo':
         state.admin.look = savedLook(state.admin.settings);
         drawLook();
@@ -2847,6 +2896,9 @@ ${vars(a.colors.dark, '  ')}
     if (editor && e.target === editor.dialog) {
       e.preventDefault();
       closeEditor(null);
+    } else if (asking && e.target === asking.dialog) {
+      e.preventDefault();
+      closeAsk(false);
     }
   }, true);
   window.addEventListener('resize', drawCrop);
