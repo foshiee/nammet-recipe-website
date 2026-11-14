@@ -4,9 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#2447b8">
+  <meta name="theme-color" content="#b23218">
   <title>Nammet Recipes</title>
-  <link id="favicon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍲%3C/text%3E%3C/svg%3E">
+  <link id="favicon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='6' fill='%23b23218'/%3E%3Ctext x='50' y='52' text-anchor='middle' dominant-baseline='central' font-family='Besley, Clarendon, Georgia, serif' font-weight='800' font-size='72' fill='%23fcfaf4'%3EN%3C/text%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/besley.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/schibsted-grotesk.woff2" as="font" type="font/woff2" crossorigin>
   <!-- Applies the saved light/dark choice before the page paints; app.js draws the toggle -->
   <script>try{var t=localStorage.getItem('recipes:theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
   <link rel="stylesheet" href="style.css">
@@ -22,10 +24,10 @@
   <button id="theme-toggle" class="theme-toggle" type="button" hidden></button>
   <footer class="site-foot">
     <span id="account-foot"></span>
-    <span class="credit">Made by <a href="https://github.com/foshiee" rel="noopener">foshiee</a> · <a href="https://github.com/foshiee/nammet-recipe-website" rel="noopener">GitHub</a> · <a href="https://docs.nammet.app/" rel="noopener">Docs</a> ·<a href="https://ko-fi.com/foshiee" rel="noopener">Buy foshiee a pint🍺</a></span>
+    <span class="credit">Made by <a href="https://github.com/foshiee" rel="noopener">foshiee</a> · <a href="https://github.com/foshiee/nammet-recipe-website" rel="noopener">GitHub</a> · <a href="https://docs.nammet.app/" rel="noopener">Docs</a> · <a href="https://ko-fi.com/foshiee" rel="noopener">Buy foshiee a pint</a></span>
   </footer>
   <noscript>
-    <p class="page status">This recipe site needs JavaScript to show recipes.</p>
+    <p class="page status">This site needs JavaScript to show recipes.</p>
   </noscript>
   <script src="app.js" defer></script>
 </body>

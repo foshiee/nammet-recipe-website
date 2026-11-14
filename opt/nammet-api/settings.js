@@ -29,10 +29,13 @@ export const COLORS = {
   bg: 'Page background',
   ink: 'Text',
   muted: 'Secondary text',
-  line: 'Lines and borders',
+  line: 'Hairlines between rows',
+  'line-strong': 'Borders of fields and boxes',
   accent: 'Accent (buttons, links)',
   'on-accent': 'Text on accent',
-  tint: 'Highlight',
+  highlight: 'Highlighter (active things)',
+  'on-highlight': 'Text on the highlighter',
+  tint: 'Wash (photo placeholders)',
   field: 'Input fields',
   danger: 'Errors'
 };
@@ -40,46 +43,53 @@ export const COLORS = {
 // Every theme must pass the CONTRAST pairs at CONTRAST.warn in both modes (the tests check).
 // The first theme is the default, and matches the defaults at the top of style.css.
 export const THEMES = {
+  paper: {
+    label: 'Paper',
+    colors: {
+      light: { bg: '#f5f1e8', ink: '#1c1a15', muted: '#5d574b', line: '#d9d2c2', accent: '#b23218', 'on-accent': '#fcfaf4', tint: '#efe1d3', field: '#fcfaf4', danger: '#7e1d12', 'line-strong': '#857d6b', highlight: '#f3cd4f', 'on-highlight': '#1c1a15' },
+      dark: { bg: '#171612', ink: '#ece7db', muted: '#a69f8f', line: '#35322b', accent: '#ee7b5e', 'on-accent': '#171612', tint: '#3b2720', field: '#201e19', danger: '#ff9d8c', 'line-strong': '#736c5e', highlight: '#e3b53c', 'on-highlight': '#171612' }
+    }
+  },
   'sea-glass': {
     label: 'Sea glass',
     colors: {
-      light: { bg: '#f1f4f2', ink: '#14212a', muted: '#566770', line: '#c9d4d0', accent: '#2447b8', 'on-accent': '#ffffff', tint: '#dde5f6', field: '#ffffff', danger: '#b3261e' },
-      dark: { bg: '#0e1519', ink: '#e8efec', muted: '#9aaca8', line: '#2a3a3f', accent: '#8eaaff', 'on-accent': '#0e1519', tint: '#1b2845', field: '#131d22', danger: '#ff8a80' }
+      light: { bg: '#eef2ef', ink: '#122027', muted: '#4f6269', line: '#cad5d1', 'line-strong': '#7b8788', accent: '#1d4f9c', 'on-accent': '#f8faf8', highlight: '#a8dcc5', 'on-highlight': '#122027', tint: '#dce5ef', field: '#f8faf8', danger: '#9e2b20' },
+      dark: { bg: '#0f1517', ink: '#e3ebe8', muted: '#97a9a5', line: '#253337', 'line-strong': '#626e70', accent: '#8fb0f0', 'on-accent': '#0f1517', highlight: '#72c2a4', 'on-highlight': '#0f1517', tint: '#1a2740', field: '#151d20', danger: '#f59a8c' }
     }
   },
   terracotta: {
     label: 'Terracotta',
     colors: {
-      light: { bg: '#f7f1ea', ink: '#2a1d16', muted: '#6b594d', line: '#e0d2c3', accent: '#a8411f', 'on-accent': '#ffffff', tint: '#f6dfd3', field: '#fffdfa', danger: '#a3231b' },
-      dark: { bg: '#1a1310', ink: '#f2e8df', muted: '#b8a596', line: '#3a2c24', accent: '#f0956e', 'on-accent': '#1a1310', tint: '#3d2419', field: '#221915', danger: '#ff8a80' }
+      light: { bg: '#f3ebe2', ink: '#2a1c15', muted: '#68554a', line: '#dfcfbf', 'line-strong': '#8f8074', accent: '#99401f', 'on-accent': '#fbf6f0', highlight: '#cdd38c', 'on-highlight': '#2a1c15', tint: '#f0dccf', field: '#fbf6f0', danger: '#7c1a16' },
+      dark: { bg: '#1a130f', ink: '#f0e5da', muted: '#b6a293', line: '#3a2b22', 'line-strong': '#76685f', accent: '#eb9570', 'on-accent': '#1a130f', highlight: '#b9c06c', 'on-highlight': '#1a130f', tint: '#3d2418', field: '#221913', danger: '#ffa08e' }
     }
   },
   sage: {
     label: 'Sage',
     colors: {
-      light: { bg: '#f2f4ee', ink: '#1c2419', muted: '#56614f', line: '#cfd8c6', accent: '#3a6435', 'on-accent': '#ffffff', tint: '#dde8d6', field: '#ffffff', danger: '#b3261e' },
-      dark: { bg: '#11160f', ink: '#e6ece1', muted: '#a3b09b', line: '#2c3628', accent: '#9fcf8f', 'on-accent': '#11160f', tint: '#22331d', field: '#171d14', danger: '#ff8a80' }
+      light: { bg: '#eff2ea', ink: '#1a2318', muted: '#535f4c', line: '#ced7c5', 'line-strong': '#7f8879', accent: '#335d30', 'on-accent': '#f9faf6', highlight: '#cdbdeb', 'on-highlight': '#1a2318', tint: '#dce7d4', field: '#f9faf6', danger: '#9c2f1e' },
+      dark: { bg: '#11160f', ink: '#e5ebdf', muted: '#a2af9a', line: '#2b3527', 'line-strong': '#676f62', accent: '#9fcf8f', 'on-accent': '#11160f', highlight: '#a990d6', 'on-highlight': '#11160f', tint: '#22331d', field: '#171d14', danger: '#ff9d88' }
     }
   },
   slate: {
     label: 'Slate',
     colors: {
-      light: { bg: '#f5f5f4', ink: '#1c1c1e', muted: '#5c5d63', line: '#d6d6d3', accent: '#3d4f63', 'on-accent': '#ffffff', tint: '#e1e6ec', field: '#ffffff', danger: '#b3261e' },
-      dark: { bg: '#141517', ink: '#ececec', muted: '#a3a5ab', line: '#2e3034', accent: '#a9bdd6', 'on-accent': '#141517', tint: '#232b36', field: '#1b1c1f', danger: '#ff8a80' }
+      light: { bg: '#f2f2f0', ink: '#1b1c1e', muted: '#5a5b61', line: '#d4d4d1', 'line-strong': '#868786', accent: '#36495e', 'on-accent': '#fafaf9', highlight: '#e2d652', 'on-highlight': '#1b1c1e', tint: '#dfe4ea', field: '#fafaf9', danger: '#9d2a1f' },
+      dark: { bg: '#141517', ink: '#ebebea', muted: '#a2a4aa', line: '#2d2f33', 'line-strong': '#6c6d6f', accent: '#a9bdd6', 'on-accent': '#141517', highlight: '#d6cd5c', 'on-highlight': '#141517', tint: '#232b36', field: '#1b1c1f', danger: '#ff9a8a' }
     }
   },
   plum: {
     label: 'Plum',
     colors: {
-      light: { bg: '#f7f3f6', ink: '#241a24', muted: '#64566a', line: '#ddd0da', accent: '#7a2d6b', 'on-accent': '#ffffff', tint: '#f0dcea', field: '#ffffff', danger: '#b3261e' },
-      dark: { bg: '#171117', ink: '#f0e8ef', muted: '#b3a3b1', line: '#362a35', accent: '#e3a1d4', 'on-accent': '#171117', tint: '#3a2236', field: '#1e171e', danger: '#ff8a80' }
+      light: { bg: '#f5f0f2', ink: '#241923', muted: '#625467', line: '#dccfd8', 'line-strong': '#8f838c', accent: '#76295f', 'on-accent': '#fcf9fa', highlight: '#ecc56a', 'on-highlight': '#241923', tint: '#efdbe7', field: '#fcf9fa', danger: '#9c2a1a' },
+      dark: { bg: '#171116', ink: '#efe7ee', muted: '#b2a2b0', line: '#352934', 'line-strong': '#716670', accent: '#e3a1d4', 'on-accent': '#171116', highlight: '#d9ae4c', 'on-highlight': '#171116', tint: '#3a2236', field: '#1e171d', danger: '#ffa08a' }
     }
   },
   'high-contrast': {
     label: 'High contrast',
     colors: {
-      light: { bg: '#ffffff', ink: '#000000', muted: '#3d3d3d', line: '#767676', accent: '#0033cc', 'on-accent': '#ffffff', tint: '#e0e8ff', field: '#ffffff', danger: '#b00020' },
-      dark: { bg: '#000000', ink: '#ffffff', muted: '#cfcfcf', line: '#8a8a8a', accent: '#9db8ff', 'on-accent': '#000000', tint: '#1a2850', field: '#0a0a0a', danger: '#ff8a80' }
+      light: { bg: '#ffffff', ink: '#000000', muted: '#3d3d3d', line: '#767676', 'line-strong': '#767676', accent: '#0033cc', 'on-accent': '#ffffff', highlight: '#ffd400', 'on-highlight': '#000000', tint: '#e0e8ff', field: '#ffffff', danger: '#b00020' },
+      dark: { bg: '#000000', ink: '#ffffff', muted: '#cfcfcf', line: '#8a8a8a', 'line-strong': '#8a8a8a', accent: '#9db8ff', 'on-accent': '#000000', highlight: '#ffd400', 'on-highlight': '#000000', tint: '#1a2850', field: '#000000', danger: '#ff8a80' }
     }
   },
   // For colour blindness: accent and errors stay apart in hue and lightness for the types in `note` (the tests check)
@@ -87,16 +97,16 @@ export const THEMES = {
     label: 'Blue & orange',
     note: 'Protanopia, deuteranopia',
     colors: {
-      light: { bg: '#f3f5f8', ink: '#15202b', muted: '#55606b', line: '#cdd5de', accent: '#0a4f9e', 'on-accent': '#ffffff', tint: '#dce8f6', field: '#ffffff', danger: '#b04000' },
-      dark: { bg: '#0f141a', ink: '#e9eef3', muted: '#9eabb8', line: '#2b3540', accent: '#a8d1ff', 'on-accent': '#0f141a', tint: '#1a2c44', field: '#151b22', danger: '#f08a3c' }
+      light: { bg: '#f1f3f6', ink: '#15202b', muted: '#535e69', line: '#cbd3dc', 'line-strong': '#7f8892', accent: '#0a4f9e', 'on-accent': '#f9fafc', highlight: '#f3cd4f', 'on-highlight': '#15202b', tint: '#dbe6f4', field: '#f9fafc', danger: '#b04000' },
+      dark: { bg: '#0f141a', ink: '#e8edf2', muted: '#9daab7', line: '#2a343f', 'line-strong': '#636c75', accent: '#a8d1ff', 'on-accent': '#0f141a', highlight: '#e3b53c', 'on-highlight': '#0f141a', tint: '#1a2c44', field: '#151b22', danger: '#f08a3c' }
     }
   },
   'teal-crimson': {
     label: 'Teal & crimson',
     note: 'Tritanopia',
     colors: {
-      light: { bg: '#f2f5f5', ink: '#142222', muted: '#536565', line: '#c9d6d6', accent: '#00736f', 'on-accent': '#ffffff', tint: '#d3ecea', field: '#ffffff', danger: '#9a0030' },
-      dark: { bg: '#0e1616', ink: '#e6f0ef', muted: '#9db0ae', line: '#283a3a', accent: '#5fd4cf', 'on-accent': '#0e1616', tint: '#173434', field: '#131d1d', danger: '#ff7a9c' }
+      light: { bg: '#eff3f2', ink: '#132121', muted: '#516363', line: '#c8d5d4', 'line-strong': '#7c8989', accent: '#006b67', 'on-accent': '#f8fafa', highlight: '#f3cd4f', 'on-highlight': '#132121', tint: '#d2e9e7', field: '#f8fafa', danger: '#94002e' },
+      dark: { bg: '#0e1616', ink: '#e5efee', muted: '#9cafad', line: '#273939', 'line-strong': '#5e6e6d', accent: '#5fd4cf', 'on-accent': '#0e1616', highlight: '#e3b53c', 'on-highlight': '#0e1616', tint: '#173434', field: '#131d1d', danger: '#ff7a9c' }
     }
   }
 };
@@ -113,6 +123,7 @@ export const CONTRAST = {
     { fg: 'accent', bg: 'bg', label: 'Links and outlined buttons' },
     { fg: 'on-accent', bg: 'accent', label: 'Text on filled buttons' },
     { fg: 'accent', bg: 'tint', label: 'Accent on highlights' },
+    { fg: 'on-highlight', bg: 'highlight', label: 'Text on the highlighter' },
     { fg: 'danger', bg: 'bg', label: 'Error messages' }
   ]
 };
@@ -131,8 +142,11 @@ export function contrastRatio(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// System font stacks only: nothing is downloaded, so the site stays dependency-free.
+// The first two are served from the site's own fonts/ folder (style.css declares them);
+// the rest are system font stacks, so nothing is downloaded from anywhere else.
 export const FONTS = {
+  besley: { label: 'Besley (cookbook serif)', stack: 'Besley, "Clarendon", "Century Schoolbook", Georgia, serif' },
+  'schibsted-grotesk': { label: 'Schibsted Grotesk', stack: '"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif' },
   'classic-serif': { label: 'Classic serif', stack: '"Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", "Book Antiqua", Georgia, serif' },
   'transitional-serif': { label: 'Book serif', stack: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif' },
   slab: { label: 'Slab serif', stack: 'Rockwell, "Rockwell Nova", "Roboto Slab", "DejaVu Serif", "Sitka Small", serif' },
@@ -155,11 +169,11 @@ export const EFFORTS = ['low', 'medium', 'high'];
 // Matches the defaults at the top of style.css.
 export const DEFAULT_APPEARANCE = {
   siteName: 'Nammet Recipes',
-  favicon: { type: 'emoji', value: '🍲' },
-  theme: 'sea-glass',
-  colors: structuredClone(THEMES['sea-glass'].colors),
-  fonts: { heading: 'classic-serif', body: 'system-sans' },
-  radius: 8,
+  favicon: { type: 'emoji', value: 'N' },
+  theme: 'paper',
+  colors: structuredClone(THEMES.paper.colors),
+  fonts: { heading: 'besley', body: 'schibsted-grotesk' },
+  radius: 2,
   // Recipe photos on the home page's list
   thumbnails: false
 };
@@ -271,7 +285,13 @@ ${vars(a.colors.dark)}
 
 const xmlEscape = (s) => s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-export function renderEmojiFavicon(text) {
+// One or two plain letters or digits become a tile in the accent colour; anything else
+// (an emoji) is drawn as it is.
+export function renderEmojiFavicon(text, colors = THEMES.paper.colors.light) {
+  if (/^[A-Za-z0-9]{1,2}$/.test(text)) {
+    const size = text.length === 1 ? 72 : 52;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="6" fill="${colors.accent}"/><text x="50" y="52" text-anchor="middle" dominant-baseline="central" font-family="Besley, Clarendon, 'Century Schoolbook', Georgia, serif" font-weight="800" font-size="${size}" fill="${colors['on-accent']}">${text}</text></svg>\n`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${xmlEscape(text)}</text></svg>\n`;
 }
 
@@ -296,7 +316,7 @@ async function writeThemeFiles(a) {
   let faviconData;
   if (a.favicon.type === 'emoji') {
     faviconFile = 'favicon.svg';
-    faviconData = renderEmojiFavicon(a.favicon.value);
+    faviconData = renderEmojiFavicon(a.favicon.value, a.colors.light);
     await writeAtomic(path.join(dir, faviconFile), faviconData, 0o644);
   } else {
     faviconFile = a.favicon.file;
@@ -320,6 +340,13 @@ function merge(saved) {
   const s = clone(DEFAULTS);
   if (saved.appearance) {
     if (Object.hasOwn(LEGACY_RADII, saved.appearance.radius)) saved.appearance.radius = LEGACY_RADII[saved.appearance.radius];
+    // Colours added since the settings were saved come from their theme
+    const base = THEMES[saved.appearance.theme] || THEMES[DEFAULT_APPEARANCE.theme];
+    if (saved.appearance.colors && typeof saved.appearance.colors === 'object') {
+      for (const scheme of ['light', 'dark']) {
+        saved.appearance.colors[scheme] = { ...base.colors[scheme], ...saved.appearance.colors[scheme] };
+      }
+    }
     try {
       s.appearance = validateAppearance({ ...DEFAULT_APPEARANCE, ...saved.appearance }, saved.appearance, { checkContrast: false });
     } catch (e) {

@@ -121,12 +121,14 @@ sudo install -d -m 0755 -o nammet -g nammet /var/www/nammet/theme /var/www/namme
 
 ```sh
 sudo install -m 0644 var/www/nammet/index.html var/www/nammet/app.js var/www/nammet/style.css var/www/nammet/robots.txt /var/www/nammet/
+sudo install -d -m 0755 /var/www/nammet/fonts
+sudo install -m 0644 var/www/nammet/fonts/* /var/www/nammet/fonts/
 sudo restorecon -Rv /var/www/nammet   # SELinux labels
 sudo cp -r opt/nammet-api /opt/nammet-api
 cd /opt/nammet-api && sudo npm ci --omit=dev && cd -
 ```
 
-The service code is copied with `cp -r` because `install` can't copy folders. `npm ci` installs the two dependencies (`@anthropic-ai/sdk` and `busboy`) at the exact versions in `package-lock.json`.
+The site serves its own fonts from `fonts/` (Besley, Schibsted Grotesk and Fragment Mono, all under the SIL Open Font License), so pages make no requests to other hosts. The service code is copied with `cp -r` because `install` can't copy folders. `npm ci` installs the two dependencies (`@anthropic-ai/sdk` and `busboy`) at the exact versions in `package-lock.json`.
 
 ### 7. Let the service write recipes
 

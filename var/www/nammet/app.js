@@ -394,7 +394,9 @@ ${vars(a.colors.dark, '  ')}
           <div id="account-head"></div>
         </div>
         ${n ?`<p class="count">${n} ${n === 1 ? 'recipe' : 'recipes'}</p>
-        <input id="search" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes" autocomplete="off" value="${esc(state.query)}">` : ''}
+        <div class="search">
+          <input id="search" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes" autocomplete="off" value="${esc(state.query)}">
+        </div>` : ''}
         <div id="tags" class="tags"></div>
         <ul id="list" class="list"></ul>
         <p id="empty" class="empty" hidden></p>
@@ -2164,7 +2166,7 @@ ${vars(a.colors.dark, '  ')}
       .map((k) => `<option value="${esc(k)}"${k === selected ? ' selected' : ''}>${esc(map[k].label)}</option>`).join('');
     const swatches = (scheme) => Object.keys(o.colors).map((k) => `
       <label class="swatch"><input type="color" name="${scheme}:${esc(k)}" value="${esc(look.colors[scheme][k])}"><span>${esc(o.colors[k])}</span></label>`).join('');
-    const sample = (c) => `<span class="theme-sample" style="background:${esc(c.bg)};color:${esc(c.ink)}">Aa<span style="background:${esc(c.accent)}"></span></span>`;
+    const sample = (c) => `<span class="theme-sample" style="background:${esc(c.bg)};color:${esc(c.ink)}">Aa<span class="dots"><span style="background:${esc(c.accent)}"></span><span style="background:${esc(c.highlight)}"></span></span></span>`;
     const themes = Object.keys(o.themes).map((k) => `
       <label class="theme-card"><input type="radio" name="theme" value="${esc(k)}"${k === look.theme ? ' checked' : ''}>
         <span class="theme-samples">${sample(o.themes[k].colors.light)}${sample(o.themes[k].colors.dark)}</span>
