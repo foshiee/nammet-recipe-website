@@ -18,6 +18,7 @@ RUN rm -f dev-*.json
 # The site, plus the example recipe and its photo. A named volume is filled from these
 # the first time it's used, so a new site shows the example.
 COPY var/www/nammet/index.html var/www/nammet/app.js var/www/nammet/style.css var/www/nammet/robots.txt /var/www/nammet/
+COPY var/www/nammet/fonts/ /var/www/nammet/fonts/
 COPY var/www/nammet/recipes/example-recipe.json /var/www/nammet/recipes/
 COPY var/www/nammet/photos/example-recipe.jpg /var/www/nammet/photos/
 RUN install -d -m 0755 -o node -g node /var/www/nammet/theme \

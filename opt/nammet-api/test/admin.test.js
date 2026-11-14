@@ -114,15 +114,20 @@ test('colourblind themes keep accent and errors apart', () => {
 
 test('theme css and favicon', () => {
   const css = settings.renderThemeCss(settings.DEFAULT_APPEARANCE);
-  assert.match(css, /--accent: #2447b8;/);
-  assert.match(css, /prefers-color-scheme: dark[\s\S]*:root:not\(\[data-theme="light"\]\) \{[^}]*--accent: #8eaaff;/);
-  assert.match(css, /:root\[data-theme="dark"\] \{[^}]*--accent: #8eaaff;/);
-  assert.match(css, /--font-heading: "Iowan Old Style"/);
-  assert.match(css, /--radius: 8px;/);
+  assert.match(css, /--accent: #b23218;/);
+  assert.match(css, /prefers-color-scheme: dark[\s\S]*:root:not\(\[data-theme="light"\]\) \{[^}]*--accent: #ee7b5e;/);
+  assert.match(css, /:root\[data-theme="dark"\] \{[^}]*--accent: #ee7b5e;/);
+  assert.match(css, /--font-heading: Besley,/);
+  assert.match(css, /--highlight: #f3cd4f;/);
+  assert.match(css, /--radius: 2px;/);
 
   const svg = settings.renderEmojiFavicon('<&">');
   assert.ok(!svg.includes('<&">'));
   assert.match(svg, /&#60;&#38;&#34;&#62;/);
+  // A letter or two becomes a tile in the accent colour
+  const tile = settings.renderEmojiFavicon('N', { accent: '#b23218', 'on-accent': '#fcfaf4' });
+  assert.match(tile, /<rect[^>]*fill="#b23218"/);
+  assert.match(tile, /fill="#fcfaf4">N<\/text>/);
 });
 
 test('favicon sniffing', () => {
@@ -163,12 +168,17 @@ test('a corner style saved before the slider still loads', async () => {
   // Saved before themes and the contrast check existed
   delete saved.appearance.theme;
   saved.appearance.colors.light.muted = '#c0c0c0';
+  // Saved before the highlighter colours existed
+  delete saved.appearance.colors.light.highlight;
+  delete saved.appearance.colors.dark['line-strong'];
   await fs.writeFile(process.env.SETTINGS_FILE, JSON.stringify(saved));
   await settings.loadSettings();
   assert.equal(settings.appearance().radius, 4);
   assert.equal(settings.appearance().siteName, 'Our Kitchen');
-  assert.equal(settings.appearance().theme, 'sea-glass');
+  assert.equal(settings.appearance().theme, 'paper');
   assert.equal(settings.appearance().colors.light.muted, '#c0c0c0');
+  assert.equal(settings.appearance().colors.light.highlight, settings.THEMES.paper.colors.light.highlight);
+  assert.equal(settings.appearance().colors.dark['line-strong'], settings.THEMES.paper.colors.dark['line-strong']);
 });
 
 test('claude settings: admin page overrides the environment', async () => {

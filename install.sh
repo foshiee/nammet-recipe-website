@@ -91,7 +91,7 @@ REPO=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
 case "$REPO/" in
   /var/www/*) die "the repo is under /var/www, where nginx could serve it. Clone it into your home directory instead." ;;
 esac
-for f in var/www/nammet/index.html var/www/nammet/app.js var/www/nammet/style.css var/www/nammet/robots.txt \
+for f in var/www/nammet/index.html var/www/nammet/app.js var/www/nammet/style.css var/www/nammet/robots.txt var/www/nammet/fonts/besley.woff2 \
          opt/nammet-api/server.js opt/nammet-api/package-lock.json etc/nginx/conf.d/nginx-nammet.conf \
          etc/nginx/nginx.conf etc/systemd/system/nammet-api.service etc/nammet/api.env.example; do
   [ -f "$REPO/$f" ] || die "$f is missing. Run this from a complete clone of the repo."
@@ -162,6 +162,8 @@ install -d -m 0755 -o nammet -g nammet /var/www/nammet/theme /var/www/nammet/pho
 
 step "Website"
 install -m 0644 "$REPO"/var/www/nammet/{index.html,app.js,style.css,robots.txt} /var/www/nammet/
+install -d -m 0755 /var/www/nammet/fonts
+install -m 0644 "$REPO"/var/www/nammet/fonts/* /var/www/nammet/fonts/
 if [ "$UPDATE" = 0 ] && ! compgen -G '/var/www/nammet/recipes/*.json' >/dev/null; then
   install -m 0644 "$REPO/var/www/nammet/recipes/example-recipe.json" /var/www/nammet/recipes/
   install -m 0644 "$REPO/var/www/nammet/photos/example-recipe.jpg" /var/www/nammet/photos/
