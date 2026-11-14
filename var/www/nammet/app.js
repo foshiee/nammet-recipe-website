@@ -2115,7 +2115,28 @@ ${vars(a.colors.dark, '  ')}
 
   const clone = (v) => JSON.parse(JSON.stringify(v));
   // The look the admin page starts from and goes back to: the site's, or this browser's in demo mode
-  const savedLook = (settings) => ({ ...clone(settings.appearance), ...(localLook() || {}) });
+  const HEX_RE = /^#[0-9a-f]{6}$/i;
+  // A look saved in this browser may come from an older version (missing colours, a theme or font
+  // that's gone), so only the parts that are still valid override the site's.
+  function savedLook(settings) {
+    const look = clone(settings.appearance);
+    const local = localLook();
+    if (!local || typeof local !== 'object') return look;
+    const o = settings.options;
+    if (o.themes[local.theme]) look.theme = local.theme;
+    for (const s of ['light', 'dark']) {
+      for (const k of Object.keys(look.colors[s])) {
+        const v = local.colors && local.colors[s] && local.colors[s][k];
+        if (typeof v === 'string' && HEX_RE.test(v)) look.colors[s][k] = v;
+      }
+    }
+    for (const f of ['heading', 'body']) {
+      if (local.fonts && o.fonts[local.fonts[f]]) look.fonts[f] = local.fonts[f];
+    }
+    if (Number.isInteger(local.radius) && local.radius >= o.radius.min && local.radius <= o.radius.max) look.radius = local.radius;
+    if (typeof local.thumbnails === 'boolean') look.thumbnails = local.thumbnails;
+    return look;
+  }
   const ROLE_TEXT = { admin: 'Admin', importer: 'Importer' };
 
   function showAdmin() {
@@ -2405,10 +2426,9 @@ ${vars(a.colors.dark, '  ')}
   // that matches the site's just clears what was saved.
   function saveLocalLook(look) {
     const o = state.admin.settings.options;
-    const hex = /^#[0-9a-f]{6}$/i;
     const valid = o.themes[look.theme] && o.fonts[look.fonts.heading] && o.fonts[look.fonts.body] &&
       Number.isInteger(look.radius) && look.radius >= o.radius.min && look.radius <= o.radius.max &&
-      ['light', 'dark'].every((s) => Object.entries(look.colors[s]).every(([k, v]) => k in o.colors && hex.test(v)));
+      ['light', 'dark'].every((s) => Object.entries(look.colors[s]).every(([k, v]) => k in o.colors && HEX_RE.test(v)));
     if (!valid) return setMsg('look', "These settings can't be saved.");
     const c = o.contrast;
     if (['light', 'dark'].some((s) => c.pairs.some((p) => contrastRatio(look.colors[s][p.fg], look.colors[s][p.bg]) < c.min))) {
