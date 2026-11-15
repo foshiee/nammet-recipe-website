@@ -2199,7 +2199,7 @@ ${vars(a.colors.dark, '  ')}
 
   // Runs a request with the form's buttons disabled; errors land in the section's message line.
   async function adminRequest(form, section, fn) {
-    const buttons = form ? [...form.querySelectorAll('button:not(:disabled)')] : []; // leaves demo-disabled ones alone
+    const buttons = form ? [...form.elements].filter((el) => el.tagName === 'BUTTON' && !el.disabled) : []; // leaves demo-disabled ones alone
     buttons.forEach((b) => { b.disabled = true; });
     setMsg(section, '');
     try {
@@ -2255,7 +2255,14 @@ ${vars(a.colors.dark, '  ')}
           ${image ? `<img class="icon-preview" src="${esc(document.getElementById('favicon').getAttribute('href'))}" alt="Current icon" width="32" height="32">` : ''}
           <input id="ad-emoji" name="emoji"${demoOff()} value="${image ? '' : esc(look.favicon.value)}" placeholder="${image ? 'Using the uploaded image' : ''}">
         </div>
-        <p class="hint">An emoji, or a letter or two.${image ? ' Leave it empty to keep the uploaded image.' : ''} To use a picture instead, upload one below.</p>
+        <p class="hint">An emoji, or a letter or two.${image ? ' Leave it empty to keep the uploaded image.' : ''} Or upload a picture below.</p>
+        <label for="ad-icon-file">Upload an icon</label>
+        <input id="ad-icon-file" type="file" name="file" form="ad-icon-form"${demoOff()} accept=".png,.ico,.webp,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp">
+        <p class="hint">PNG, ICO or WebP, under 256 KB. Square images work best. It replaces the emoji as soon as it's uploaded.</p>
+        <div class="actions">
+          <button class="button secondary" type="submit" form="ad-icon-form"${demoOff()}>Upload icon</button>
+        </div>
+        <div id="msg-icon" aria-live="polite"></div>
         <fieldset class="themes"><legend>Colour theme</legend>${themes}</fieldset>
         <p class="hint">Each theme has light and dark colours (shown left and right), used to match each visitor's device.</p>
         <div id="look-theme"></div>
@@ -2285,13 +2292,7 @@ ${vars(a.colors.dark, '  ')}
         </div>
         <div id="msg-look" aria-live="polite"></div>
       </form>
-      <form class="admin-form" data-action="admin-favicon">
-        <label for="ad-icon-file">Upload an icon</label>
-        <input id="ad-icon-file" type="file" name="file"${demoOff()} accept=".png,.ico,.webp,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp">
-        <p class="hint">PNG, ICO or WebP, under 256 KB. Square images work best. It replaces the emoji as soon as it's uploaded.</p>
-        <div class="actions"><button class="button secondary" type="submit"${demoOff()}>Upload icon</button></div>
-        <div id="msg-icon" aria-live="polite"></div>
-      </form>`;
+      <form id="ad-icon-form" data-action="admin-favicon"></form>`;
     previewLook();
   }
 
